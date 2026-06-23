@@ -65,6 +65,10 @@ ColumnDef {
     derivedFrom?: string               // key of source column to derive value from
     derive?:      (src: string)        // transform fn; receives source cell's first
                     => string          // string value, returns this column's value
+    render?:      (value: string,      // custom sub-row renderer; receives the
+                   row: NormalizedRow) // sub-row text and the full row object.
+                    => Node | string   // return a DOM Node (appended) or string
+                                       // (textContent). Does NOT affect sort/filter.
 }
 ```
 

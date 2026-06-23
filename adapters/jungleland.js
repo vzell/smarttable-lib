@@ -16,13 +16,14 @@
  *     rows:      JunglelandAdapter.extract(),
  *     container: document.querySelector(JunglelandAdapter.triggerSelector),
  *   });
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 // ---------------------------------------------------------------------------
 // CHANGELOG
 // ---------------------------------------------------------------------------
 // 1.0.0 — initial release
+// 1.1.0 — href column uses ColumnDef.render to produce a clickable <a> link.
 // ---------------------------------------------------------------------------
 
 /** @typedef {import('../src/types.js').ColumnDef}    ColumnDef */
@@ -43,7 +44,15 @@ const JUNGLELAND_COLUMNS = [
       derivedFrom: 'date', derive: v => v.slice(8, 10) },
     { key: 'title',   label: 'Title',   type: 'string' },
     { key: 'version', label: 'Ver',     type: 'number', width: '46px', filterable: false },
-    { key: 'href',    label: 'Link',    type: 'string', sortable: false, filterable: false },
+    { key: 'href',    label: 'Link',    type: 'string', sortable: false, filterable: false,
+      render: (url) => {
+          const a = document.createElement('a');
+          a.href = url;
+          a.textContent = 'Open';
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          return a;
+      } },
 ];
 
 // ---------------------------------------------------------------------------

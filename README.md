@@ -151,6 +151,7 @@ cell, requires `collapsible: true` on the column).
 | `maxWidth` | `number` | — | Maximum px width enforced during resize |
 | `derivedFrom` | `string` | — | Key of the source column to derive this column's value from |
 | `derive` | `(src: string) => string` | — | Transform applied to the source column's first string value |
+| `render` | `(value: string, row: NormalizedRow) => Node \| string` | — | Custom sub-row renderer. Return a DOM Node to append or a string for textContent. Sort and filter always use the raw data value regardless. |
 
 ### Derived columns
 

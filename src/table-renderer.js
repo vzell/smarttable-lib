@@ -7,7 +7,7 @@
  *     1. inject() — create table skeleton + inject trigger button on the page
  *     2. render() — build thead/tbody from current data + filter/sort/collapse state
  *     3. re-render() — called after any state change (filter, sort, collapse toggle)
- * @version 1.3.1
+ * @version 1.3.2
  */
 
 // ---------------------------------------------------------------------------
@@ -26,6 +26,10 @@
 // 1.2.0 — derived column support
 //         _expandRow() pre-computes ColumnDef.derive(sourceValue) values into
 //         each row at construction time so sort/filter/collapse see them.
+// 1.3.2 — ColumnDef.render callback support
+//         _makeSubrow() accepts (text, hidden, col, row); if col.render is set,
+//         its return value is appended as a Node or set as textContent.
+//         Sort and filter are unaffected — they use raw data values only.
 // 1.3.1 — set type="button" on every created <button> element so none of them
 //         accidentally submit a host-page <form> (HTML default is type="submit").
 // 1.3.0 — complete ResizeEngine wiring
@@ -485,7 +489,7 @@ export class TableRenderer {
         if (!col.collapsible || subRows.length <= (col.peekRows ?? 1)) {
             // Single-row or non-collapsible: render all sub-rows, no toggle
             for (const text of subRows) {
-                inner.appendChild(this._makeSubrow(text, false));
+                inner.appendChild(this._makeSubrow(text, false, col, row));
             }
         } else {
             // Multi-row collapsible cell
@@ -512,7 +516,7 @@ export class TableRenderer {
 
             subRows.forEach((text, i) => {
                 const hidden = collapsed && i >= peekRows;
-                inner.appendChild(this._makeSubrow(text, hidden));
+                inner.appendChild(this._makeSubrow(text, hidden, col, row));
             });
         }
 
@@ -697,18 +701,32 @@ export class TableRenderer {
     }
 
     /**
-     * Creates a sub-row element.
+     * Creates a sub-row element, optionally using ColumnDef.render for custom output.
+     * Sort and filter always operate on the raw `text` value — render is display-only.
      *
-     * @param {string}  text
-     * @param {boolean} hidden
+     * @param {string}          text
+     * @param {boolean}         hidden
+     * @param {ColumnDef|null}  [col]
+     * @param {NormalizedRow|null} [row]
      * @returns {HTMLElement}
      */
-    _makeSubrow(text, hidden) {
+    _makeSubrow(text, hidden, col = null, row = null) {
         const div = document.createElement('div');
         div.className = hidden
             ? `${C.SUBROW} ${C.SUBROW_HIDDEN}`
             : C.SUBROW;
-        div.textContent = text;
+
+        if (col?.render) {
+            const result = col.render(text, row);
+            if (result instanceof Node) {
+                div.appendChild(result);
+            } else {
+                div.textContent = String(result ?? text);
+            }
+        } else {
+            div.textContent = text;
+        }
+
         return div;
     }
 

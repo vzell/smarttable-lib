@@ -3,7 +3,7 @@
  * @description Shared type definitions and JSDoc typedefs for smarttable-lib.
  *   All public APIs are typed via JSDoc so consumers get IDE intellisense
  *   without requiring a TypeScript build step.
- * @version 1.1.0
+ * @version 1.2.0
  */
 
 // ---------------------------------------------------------------------------
@@ -13,6 +13,7 @@
 //         CellMeta, ImageMeta, ColumnDef, NormalizedRow, TableOptions,
 //         CollapseState, FilterState, SortEntry defined.
 // 1.1.0 — ColumnDef gains derivedFrom and derive for computed columns.
+// 1.2.0 — ColumnDef gains render callback for custom cell DOM output.
 // ---------------------------------------------------------------------------
 
 /**
@@ -63,6 +64,13 @@
  *                                         value (first sub-row string for array-valued cells).
  *                                         Must return a plain string. Required when derivedFrom
  *                                         is set.
+ * @property {function(string, NormalizedRow): (Node|string)} [render]
+ *                                       - Custom renderer for a single sub-row. Called once per
+ *                                         sub-row string with (value, fullRow). Return a DOM Node
+ *                                         to append inside the sub-row div, or a string to set as
+ *                                         textContent. When omitted, textContent is used.
+ *                                         Does NOT affect sort or filter — those always operate on
+ *                                         the raw data value.
  */
 
 /**
