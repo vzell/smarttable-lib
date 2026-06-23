@@ -15,7 +15,7 @@
  *
  *   Usage via @require (auto-injection, no extra code needed):
  *     // @require .../src/styles.js
- * @version 1.0.0
+ * @version 1.2.0
  */
 
 // ---------------------------------------------------------------------------
@@ -25,6 +25,8 @@
 //         Full stylesheet for all st- classes: wrapper, global bar, toggles,
 //         trigger button, table, thead/th/sort/collapse/filter badges,
 //         tbody/tr/td, sub-rows, cell-toggle, shading, dropdown.
+// 1.2.0 — filter row styles (st-filter-row, st-filter-th, st-filter-input,
+//          st-filter-regex-btn) and match highlight (mark.st-highlight).
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -482,6 +484,72 @@ export const STYLES = /* css */`
     color: #bbb;
     font-style: italic;
     font-size: 12px;
+}
+
+/* ============================================================
+   Filter row (second <thead> row)
+   ============================================================ */
+
+.st-filter-row .st-filter-th {
+    padding: 3px 4px;
+    border: 1px solid #c8cad0;
+    background: #f5f7fa;
+    font-weight: normal;
+}
+
+.st-filter-input {
+    width: calc(100% - 28px);
+    padding: 2px 5px;
+    border: 1px solid #c8cad0;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: inherit;
+    background: #fff;
+    color: inherit;
+    min-width: 0;
+    vertical-align: middle;
+}
+
+.st-filter-input:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: -1px;
+    border-color: #3b82f6;
+}
+
+.st-filter-regex-btn {
+    padding: 1px 4px;
+    margin-left: 2px;
+    border: 1px solid #c8cad0;
+    border-radius: 3px;
+    background: #f5f5f7;
+    font-size: 10px;
+    font-family: monospace;
+    cursor: pointer;
+    color: #888;
+    vertical-align: middle;
+    user-select: none;
+}
+
+.st-filter-regex-btn:hover {
+    background: #eaeaec;
+    border-color: #aaa;
+}
+
+.st-filter-regex-btn[data-active="true"] {
+    background: #2563eb;
+    border-color: #1d4ed8;
+    color: #fff;
+}
+
+/* ============================================================
+   Filter match highlight
+   ============================================================ */
+
+.st-wrapper mark.st-highlight {
+    background-color: #fef08a;
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
 }
 `;
 

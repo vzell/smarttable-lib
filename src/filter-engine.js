@@ -8,7 +8,7 @@
  *   Value selections within a column are OR-combined.
  *   Meta + value + regex filters across columns are AND-combined.
  *   Global regex is AND-combined with all column results.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 // ---------------------------------------------------------------------------
@@ -17,6 +17,10 @@
 // 1.0.0 — initial release
 //         META_PREDICATES map, FilterEngine class with filter(), buildUniqueValues(),
 //         buildMetaEntries() defined.
+// 1.1.0 — ColumnFilter.isRegex support: when false, filter text is escaped so
+//          it matches literally (no special regex characters). Added exported
+//          helpers escapeRegex() and buildHighlightPattern() used by the renderer
+//          to mark filter matches in cell text.
 // ---------------------------------------------------------------------------
 
 /**
@@ -26,6 +30,42 @@
  * @typedef {import('./types.js').FilterState}  FilterState
  * @typedef {import('./types.js').ColumnFilter} ColumnFilter
  */
+
+// ---------------------------------------------------------------------------
+// Shared regex helpers (also used by TableRenderer for highlighting)
+// ---------------------------------------------------------------------------
+
+/**
+ * Escapes all regex special characters in a string so it can be used as a
+ * literal pattern inside RegExp().
+ *
+ * @param {string} s
+ * @returns {string}
+ */
+export function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Builds a RegExp with the /g flag, suitable for iterating all matches during
+ * highlighting. Returns null for empty input or invalid regex.
+ *
+ * @param {string}  text          - The filter input text.
+ * @param {boolean} isRegex       - If false, text is escaped before compiling.
+ * @param {boolean} caseSensitive - If true, the /i flag is omitted.
+ * @returns {RegExp|null}
+ */
+export function buildHighlightPattern(text, isRegex, caseSensitive) {
+    if (!text.trim()) {
+        return null;
+    }
+    try {
+        const src = isRegex ? text : escapeRegex(text);
+        return new RegExp(src, caseSensitive ? 'g' : 'gi');
+    } catch {
+        return null;
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Meta predicate registry
@@ -183,9 +223,10 @@ export class FilterEngine {
                     }
                 }
 
-                // Stage 3: column regex
+                // Stage 3: column text/regex filter
                 if (hasRegex) {
-                    const re = this._buildRegex(cf.regex, cf.regexCase);
+                    const pat = (cf.isRegex ?? false) ? cf.regex : escapeRegex(cf.regex);
+                    const re  = this._buildRegex(pat, cf.regexCase);
                     if (!re) {
                         return false;
                     }

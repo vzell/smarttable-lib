@@ -8,7 +8,7 @@
  *   The dropdown is a plain HTMLElement (no shadow DOM) so it inherits the
  *   host page's scrolling and z-index context. Callers are responsible for
  *   positioning it relative to the column header.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 // ---------------------------------------------------------------------------
@@ -17,6 +17,8 @@
 // 1.0.0 — initial release
 //         Dropdown class with build(), show(), hide(), destroy(),
 //         getColumnFilter() defined.
+// 1.1.0 — emptyColumnFilter() and _cloneFilter() include isRegex (default false)
+//          so the field survives round-trips through the dropdown onChange handler.
 // ---------------------------------------------------------------------------
 
 import { META_LABELS } from './filter-engine.js';
@@ -407,6 +409,7 @@ export class Dropdown {
             metaEntries:   f.metaEntries.slice(),
             valueEntries:  f.valueEntries.slice(),
             regex:         f.regex,
+            isRegex:       f.isRegex ?? false,
             regexExclude:  f.regexExclude,
             regexCase:     f.regexCase,
         };
@@ -425,6 +428,7 @@ export function emptyColumnFilter(colKey) {
         metaEntries:  [],
         valueEntries: [],
         regex:        '',
+        isRegex:      false,
         regexExclude: false,
         regexCase:    false,
     };

@@ -7,7 +7,7 @@
  *     1. inject() — create table skeleton + inject trigger button on the page
  *     2. render() — build thead/tbody from current data + filter/sort/collapse state
  *     3. re-render() — called after any state change (filter, sort, collapse toggle)
- * @version 1.3.2
+ * @version 1.4.0
  */
 
 // ---------------------------------------------------------------------------
@@ -39,14 +39,25 @@
 //         _buildTh(): attachDragHandlers() called per column; th.style.width
 //           removed (invariant: widths via <col> only, never on <th>/<td>).
 //         _rerender(): re-attach ResizeEngine so colgroup tracks new thead.
+// 1.4.0 — permanent filter row + match highlighting
+//         _buildThead() now produces two rows: column headers + filter row.
+//         _buildHeaderRow() extracted from old _buildThead() body.
+//         _buildFilterRow() adds a text input + regex toggle per filterable column.
+//         Typing in the filter row updates ColumnFilter.regex; the .* button
+//         toggles ColumnFilter.isRegex. Focus and cursor are restored after
+//         each re-render so typing feels seamless.
+//         _buildTbody() pre-computes highlight patterns; _makeSubrow() wraps
+//         matches in <mark class="st-highlight"> via _applyHighlight().
+//         Cells with a col.render callback are not highlighted.
+//         stickyHeader inline styles moved from _buildTable() into _buildThead().
 // ---------------------------------------------------------------------------
 
-import { CollapseEngine }              from './collapse-engine.js';
-import { FilterEngine }                from './filter-engine.js';
-import { SortEngine }                  from './sort-engine.js';
-import { Dropdown, emptyColumnFilter } from './dropdown.js';
-import { inspectCell }                 from './cell-inspector.js';
-import { ResizeEngine }                from './resize-engine.js';
+import { CollapseEngine }                          from './collapse-engine.js';
+import { FilterEngine, buildHighlightPattern }     from './filter-engine.js';
+import { SortEngine }                              from './sort-engine.js';
+import { Dropdown, emptyColumnFilter }             from './dropdown.js';
+import { inspectCell }                             from './cell-inspector.js';
+import { ResizeEngine }                            from './resize-engine.js';
 
 /**
  * @typedef {import('./types.js').ColumnDef}    ColumnDef
@@ -79,10 +90,14 @@ const C = {
     SHADING:        'st-shading-changed',
     FILTER_ACTIVE:  'st-th--filter-active',
     SORT_ACTIVE:    'st-th--sort-active',
-    BTN_TRIGGER:     'st-btn-trigger',
-    BTN_AUTO_RESIZE: 'st-btn-auto-resize',
-    WRAPPER:         'st-wrapper',
-    GLOBAL_BAR:      'st-global-bar',
+    BTN_TRIGGER:      'st-btn-trigger',
+    BTN_AUTO_RESIZE:  'st-btn-auto-resize',
+    WRAPPER:          'st-wrapper',
+    GLOBAL_BAR:       'st-global-bar',
+    FILTER_ROW:       'st-filter-row',
+    FILTER_TH:        'st-filter-th',
+    FILTER_INPUT:     'st-filter-input',
+    FILTER_REGEX_BTN: 'st-filter-regex-btn',
 };
 
 export class TableRenderer {
@@ -291,32 +306,108 @@ export class TableRenderer {
         table.appendChild(thead);
         table.appendChild(tbody);
 
-        if (this._options.stickyHeader) {
-            thead.style.position = 'sticky';
-            thead.style.top = '0';
-        }
-
         this._tableEl = table;
         this._tbodyEl = tbody;
         return table;
     }
 
     /**
-     * Builds the <thead> row with one <th> per column.
+     * Builds the <thead> with two rows: column headers + filter inputs.
      *
      * @returns {HTMLTableSectionElement}
      */
     _buildThead() {
         const thead = document.createElement('thead');
         thead.className = C.THEAD;
-        const tr = document.createElement('tr');
 
+        thead.appendChild(this._buildHeaderRow());
+        thead.appendChild(this._buildFilterRow());
+
+        if (this._options.stickyHeader) {
+            thead.style.position = 'sticky';
+            thead.style.top = '0';
+        }
+
+        return thead;
+    }
+
+    /**
+     * Builds the primary header <tr> with one <th> per column.
+     * Extracted from the old _buildThead() body.
+     *
+     * @returns {HTMLTableRowElement}
+     */
+    _buildHeaderRow() {
+        const tr = document.createElement('tr');
         for (const col of this._columns) {
             tr.appendChild(this._buildTh(col));
         }
+        return tr;
+    }
 
-        thead.appendChild(tr);
-        return thead;
+    /**
+     * Builds the permanent filter row: a second <tr> in <thead> with a text
+     * input per filterable column. Each input also has a regex toggle button.
+     *
+     * @returns {HTMLTableRowElement}
+     */
+    _buildFilterRow() {
+        const tr = document.createElement('tr');
+        tr.className = C.FILTER_ROW;
+
+        for (const col of this._columns) {
+            const th = document.createElement('th');
+            th.className = C.FILTER_TH;
+
+            if (col.filterable !== false) {
+                const cf = this._getColumnFilter(col.key);
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = C.FILTER_INPUT;
+                input.dataset.colkey = col.key;
+                input.placeholder = col.label;
+                input.value = cf.regex;
+
+                input.addEventListener('input', () => {
+                    const sel = [input.selectionStart, input.selectionEnd];
+                    this._setColumnFilter({
+                        ...this._getColumnFilter(col.key),
+                        regex: input.value,
+                    });
+                    this._rerender();
+                    const restored = this._tableEl.querySelector(
+                        `.${C.FILTER_INPUT}[data-colkey="${col.key}"]`
+                    );
+                    if (restored instanceof HTMLInputElement) {
+                        restored.focus();
+                        restored.setSelectionRange(sel[0], sel[1]);
+                    }
+                });
+
+                const regexBtn = document.createElement('button');
+                regexBtn.type = 'button';
+                regexBtn.className = C.FILTER_REGEX_BTN;
+                regexBtn.textContent = '.*';
+                regexBtn.title = 'Toggle regex mode';
+                regexBtn.dataset.active = String(cf.isRegex ?? false);
+
+                regexBtn.addEventListener('click', () => {
+                    this._setColumnFilter({
+                        ...this._getColumnFilter(col.key),
+                        isRegex: !(this._getColumnFilter(col.key).isRegex ?? false),
+                    });
+                    this._rerender();
+                });
+
+                th.appendChild(input);
+                th.appendChild(regexBtn);
+            }
+
+            tr.appendChild(th);
+        }
+
+        return tr;
     }
 
     /**
@@ -416,6 +507,22 @@ export class TableRenderer {
      * @returns {HTMLTableSectionElement}
      */
     _buildTbody() {
+        // Pre-compute highlight patterns once so _makeSubrow can mark matches
+        this._globalPattern = buildHighlightPattern(
+            this._filterState.globalRegex,
+            true,
+            this._filterState.globalRegexCase
+        );
+        this._colPatterns = new Map();
+        for (const cf of this._filterState.columnFilters) {
+            if (cf.regex.trim()) {
+                this._colPatterns.set(
+                    cf.colKey,
+                    buildHighlightPattern(cf.regex, cf.isRegex ?? false, cf.regexCase)
+                );
+            }
+        }
+
         // Apply filter then sort
         const filtered = this._filter.filter(
             this._rows,
@@ -724,10 +831,78 @@ export class TableRenderer {
                 div.textContent = String(result ?? text);
             }
         } else {
-            div.textContent = text;
+            const patterns = [
+                this._colPatterns?.get(col?.key),
+                this._globalPattern,
+            ].filter(Boolean);
+
+            if (patterns.length > 0) {
+                this._applyHighlight(div, text, /** @type {RegExp[]} */ (patterns));
+            } else {
+                div.textContent = text;
+            }
         }
 
         return div;
+    }
+
+    /**
+     * Appends text content to div, wrapping matched substrings in
+     * <mark class="st-highlight">. Handles multiple overlapping patterns.
+     *
+     * @param {HTMLElement} div
+     * @param {string}      text
+     * @param {RegExp[]}    patterns - All active highlight regexes (/g flag required).
+     * @returns {void}
+     */
+    _applyHighlight(div, text, patterns) {
+        // Collect all [start, end) match ranges across all patterns
+        /** @type {number[][]} */
+        const ranges = [];
+        for (const re of patterns) {
+            re.lastIndex = 0;
+            let m;
+            while ((m = re.exec(text)) !== null) {
+                if (m[0].length === 0) {
+                    re.lastIndex++;
+                    continue;
+                }
+                ranges.push([m.index, m.index + m[0].length]);
+            }
+        }
+
+        if (ranges.length === 0) {
+            div.textContent = text;
+            return;
+        }
+
+        // Sort and merge overlapping ranges
+        ranges.sort((a, b) => a[0] - b[0]);
+        const merged = [ranges[0].slice()];
+        for (let i = 1; i < ranges.length; i++) {
+            const last = merged[merged.length - 1];
+            if (ranges[i][0] <= last[1]) {
+                last[1] = Math.max(last[1], ranges[i][1]);
+            } else {
+                merged.push(ranges[i].slice());
+            }
+        }
+
+        // Build DOM: plain TextNodes interleaved with <mark> elements
+        let pos = 0;
+        for (const [start, end] of merged) {
+            if (pos < start) {
+                div.appendChild(document.createTextNode(text.slice(pos, start)));
+            }
+            const mark = document.createElement('mark');
+            mark.className = 'st-highlight';
+            mark.textContent = text.slice(start, end);
+            div.appendChild(mark);
+            pos = end;
+        }
+        if (pos < text.length) {
+            div.appendChild(document.createTextNode(text.slice(pos)));
+        }
     }
 
     /**

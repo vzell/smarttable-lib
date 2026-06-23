@@ -3,7 +3,7 @@
  * @description Shared type definitions and JSDoc typedefs for smarttable-lib.
  *   All public APIs are typed via JSDoc so consumers get IDE intellisense
  *   without requiring a TypeScript build step.
- * @version 1.2.0
+ * @version 1.3.0
  */
 
 // ---------------------------------------------------------------------------
@@ -14,6 +14,8 @@
 //         CollapseState, FilterState, SortEntry defined.
 // 1.1.0 — ColumnDef gains derivedFrom and derive for computed columns.
 // 1.2.0 — ColumnDef gains render callback for custom cell DOM output.
+// 1.3.0 — ColumnFilter gains isRegex; when false the regex field is treated as
+//          a literal substring (escaped before pattern compilation).
 // ---------------------------------------------------------------------------
 
 /**
@@ -108,7 +110,10 @@
  * @property {string}   colKey       - Column key this filter applies to.
  * @property {string[]} metaEntries  - Selected meta predicates, e.g. ['isEmpty', 'brokenSrc'].
  * @property {string[]} valueEntries - Selected unique text values.
- * @property {string}   regex        - Column-level regex string (may be empty).
+ * @property {string}   regex        - Column-level filter string (may be empty).
+ * @property {boolean}  [isRegex=false] - If false (default), regex is escaped and matched
+ *                                        literally as a substring. If true, it is compiled
+ *                                        as a JavaScript regular expression.
  * @property {boolean}  regexExclude - If true, regex is an exclusion filter.
  * @property {boolean}  regexCase    - If true, regex is case-sensitive.
  */
