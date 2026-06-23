@@ -23,33 +23,74 @@
 
 ### CSS classes inventory
 
+#### Layout and global bar
+
 | Class | Element | Purpose |
 |-------|---------|---------|
 | `st-wrapper` | div | Outer container for global bar + table |
-| `st-global-bar` | div | Bar above table: global filter + auto-size button |
-| `st-global-input` | input | Global regex input |
-| `st-toggle` | button | Exclude / Case toggles; `data-active="true"` when on |
+| `st-global-bar` | div | Bar above table: global filter + action buttons |
+| `st-global-input` | input | Global filter text input |
+| `st-filter-checkbox` | label | `Cc` / `Rx` / `Ex` checkbox label in global or filter-row bar |
 | `st-btn-trigger` | button | Show/hide table trigger on host page |
 | `st-btn-auto-resize` | button | Auto-size columns button |
+| `st-btn-expand-all` | button | Expand/Collapse ALL multi-row cells toggle |
+| `st-btn-toggle-hl` | button | Toggle ALL highlighting on/off |
+| `st-btn-clear-col-filters` | button | Clear ALL column filters |
+| `st-btn-clear-all-filters` | button | Clear ALL filters (column + global) |
+| `st-clear-btn` | button | `✕` clear button inset inside a filter input |
+
+#### Table structure
+
+| Class | Element | Purpose |
+|-------|---------|---------|
 | `st-table` | table | Main table |
 | `st-thead` | thead | Table head (sticky by default) |
 | `st-th` | th | Header cell |
-| `st-th-label` | span | Column label text (cursor:pointer when sortable) |
-| `st-th-sort-badge` | span | Sort priority number |
-| `st-th-sort-dir` | span | Sort direction arrow |
-| `st-th-collapse` | button | Column collapse toggle badge |
-| `st-th-filter-btn` | button | Column filter open button |
+| `st-th-inner` | div | Three-zone flex container inside `<th>` (left/centre/right) |
+| `st-th-left` | div | Left zone: column label + sort icons |
+| `st-th-centre` | div | Centre zone: column-level collapse toggle (collapsible cols only) |
+| `st-th-right` | div | Right zone: unique-values badge |
+| `st-th-label` | span | Column label text |
+| `st-sort-icon` | button | One of the three sort-icon buttons (⇅ / ▲ / ▼) |
+| `st-sort-icon-active` | button modifier | Applied to the active sort direction button (green + yellow bg) |
+| `st-th-collapse` | button | Column-level collapse toggle in centre zone |
+| `st-uniq-badge` | button | `{count}📊` unique-values badge in right zone |
 | `st-th--sort-active` | th modifier | Applied when column is in sort stack |
 | `st-th--filter-active` | th modifier | Applied when column has active filter |
+| `st-mscol-hdr-0` … `st-mscol-hdr-7` | th modifier | Solid 60 % hue tint by sort priority (amber→vanilla) |
 | `st-tbody` | tbody | Table body |
 | `st-tr` | tr | Data row |
 | `st-td` | td | Data cell |
-| `st-td-inner` | div | Inner wrapper for sub-rows + toggle |
+| `st-td-inner` | div | Inner flex wrapper for sub-rows + cell toggle |
 | `st-subrow` | div | One sub-row line inside a cell |
 | `st-subrow--hidden` | div modifier | Hidden when cell is collapsed |
-| `st-cell-toggle` | button | Per-cell collapse/expand toggle |
-| `st-shade-a` | tr modifier | Value-group shading — white (default group, primary sort active) |
-| `st-shade-b` | tr modifier | Value-group shading — light blue (alternating group) |
+| `st-cell-toggle-row` | div | Flex row containing the per-cell toggle, pushed right via `margin-left:auto` |
+| `st-cell-toggle` | button | Per-cell collapse/expand toggle (`▶/N/▤` or `◀/N/▤`) |
+
+#### Shading (per sorted column, per priority)
+
+| Class | Applied to | Purpose |
+|-------|-----------|---------|
+| `st-mscol-0a` / `st-mscol-0b` | td | Amber tint, light / dark (priority 0) |
+| `st-mscol-1a` / `st-mscol-1b` | td | Sky-blue tint (priority 1) |
+| `st-mscol-2a` / `st-mscol-2b` | td | Mint tint (priority 2) |
+| `st-mscol-3a` / `st-mscol-3b` | td | Mauve tint (priority 3) |
+| `st-mscol-4a` / `st-mscol-4b` | td | Peach tint (priority 4) |
+| `st-mscol-5a` / `st-mscol-5b` | td | Teal tint (priority 5) |
+| `st-mscol-6a` / `st-mscol-6b` | td | Lavender tint (priority 6) |
+| `st-mscol-7a` / `st-mscol-7b` | td | Vanilla tint (priority 7) |
+
+_Note: `st-shade-a` / `st-shade-b` (TR-level, primary-only shading) are **removed** in v1.2.0 and replaced by the per-column TD tinting above._
+
+#### Filter row and dropdown
+
+| Class | Element | Purpose |
+|-------|---------|---------|
+| `st-filter-row` | tr | Second header row (permanent filter inputs) |
+| `st-filter-th` | th | Cell in the filter row |
+| `st-filter-input` | input | Per-column text filter input; `data-colkey` for focus-restore |
+| `st-highlight` | mark | Global filter match (yellow `#FFD700` background) |
+| `st-col-highlight` | mark | Column filter match (light blue `#add8e6` background) |
 | `st-dropdown` | div | Filter dropdown root |
 | `st-dropdown-section` | div | One section within dropdown |
 | `st-dropdown-section-head` | div | Section heading label |
@@ -62,11 +103,6 @@
 | `st-dropdown-count` | span | Occurrence count in unique values list |
 | `st-dropdown-no-results` | div | Shown when quick filter matches nothing |
 | `st-dropdown-divider` | hr | Divider between sections |
-| `st-filter-row` | tr | Second header row (permanent filter inputs) |
-| `st-filter-th` | th | Cell in the filter row |
-| `st-filter-input` | input | Per-column text filter input; `data-colkey` attribute used for focus-restore after re-render |
-| `st-filter-regex-btn` | button | Plain-text ↔ regex toggle; `data-active="true"` when regex mode is on |
-| `st-highlight` | mark | Wraps matching substrings in filtered cell text (yellow background) |
 
 ---
 

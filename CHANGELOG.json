@@ -1,5 +1,39 @@
 [
     {
+        "version": "1.2.0",
+        "date": "2026-06-23",
+        "summary": "ShowAllEntityData-inspired UI overhaul: three-button sort, per-priority shading, Cc/Rx/Ex filter modifiers, new collapse glyph format, 📊 badge, toolbar action buttons, and performance optimisations.",
+        "added": [
+            "Three sort-icon buttons (⇅ ▲ ▼) in every sortable column header — always visible; active button highlighted with green text + yellow background + Unicode superscript priority (¹²³…); ⇅ removes the column from the sort stack",
+            "Per-priority per-column TD shading — 8 hue families (amber, sky, mint, mauve, peach, teal, lavender, vanilla) with two shades each (0.22 α / 0.44 α); shade alternates on value change within each sorted column; applied simultaneously to all active sort columns",
+            "Header TH tinting — sorted column headers receive a solid 60 % tint matching their sort priority hue",
+            "Three-zone flex layout for <th> (st-th-inner) — left: label + sort icons; centre: collapse toggle; right: 📊 badge",
+            "Cc / Rx / Ex checkbox modifiers on global filter bar — Cc (case-sensitive), Rx (regex mode, default off = literal), Ex (exclude matches)",
+            "Cc / Rx / Ex checkbox modifiers per column filter input in the filter row",
+            "✕ clear button inset at right edge of global and column filter inputs",
+            "Escape key clears the focused filter input (global or column)",
+            "st-col-highlight CSS class — light blue (#add8e6) background for column-filter match highlights, distinct from global-filter yellow (st-highlight)",
+            "New collapse glyph format: ▶/N/▤ (collapsed) and ◀/N/▤ (expanded); N = sub-row count for cell toggles, multi-row cell count for column header toggles",
+            "{count}📊 unique-values badge right-aligned in every filterable column header — replaces ⧨/⧩ button; click opens the filter dropdown",
+            "Expand/Collapse ALL button (st-btn-expand-all) in global bar — expands all collapsible columns if any are collapsed, else collapses all",
+            "Toggle ALL highlighting button (st-btn-toggle-hl) — shows/hides <mark> elements without rerunning the filter",
+            "Clear ALL column filters button (st-btn-clear-col-filters) — resets all ColumnFilter entries to empty",
+            "Clear ALL filters button (st-btn-clear-all-filters) — also resets global filter and its checkboxes",
+            "DocumentFragment batching in _buildTbody() — all <tr> elements built into a fragment and appended in one operation",
+            "Event delegation on <tbody> for cell-toggle clicks — single listener keyed by data-colkey + data-origidx instead of per-button addEventListener",
+            "FilterEngine empty-column fast-path — columns with no regex, no meta, no value entries skipped without building a RegExp",
+            "SortEngine compiled comparator — sort stack compiled into a single closure before Array.sort(); no per-pair stack traversal",
+            "ResizeEngine bodyRows hoisting — snapshot hoisted once before the column loop; hidden rows skipped during measurement"
+        ],
+        "notes": [
+            "st-shade-a and st-shade-b (TR-level primary-column shading) are removed; shading is now applied as per-column TD classes (st-mscol-{P}a/b)",
+            "st-th-filter-btn (⧨/⧩) is removed; the 📊 badge (st-uniq-badge) opens the dropdown for all filterable columns",
+            "SortEngine.pushSort(colKey, direction?) now accepts an explicit direction param; the ⇅ button calls removeSort(colKey) directly",
+            "FilterState gains globalIsRegex: boolean (default false = literal matching); global filter was previously always in regex mode",
+            "HEADER_CHROME_PX increased from 56 to ~90 to budget for the three-zone header"
+        ]
+    },
+    {
         "version": "1.1.0",
         "date": "2026-06-23",
         "summary": "Filter row, regex/plain-text toggle, match highlighting, render callback, shading fix, dev workflow.",

@@ -8,7 +8,7 @@
  *   The dropdown is a plain HTMLElement (no shadow DOM) so it inherits the
  *   host page's scrolling and z-index context. Callers are responsible for
  *   positioning it relative to the column header.
- * @version 1.1.0
+ * @version 1.2.0
  */
 
 // ---------------------------------------------------------------------------
@@ -19,6 +19,8 @@
 //         getColumnFilter() defined.
 // 1.1.0 — emptyColumnFilter() and _cloneFilter() include isRegex (default false)
 //          so the field survives round-trips through the dropdown onChange handler.
+// 1.2.0 — Defer input.focus() with setTimeout(0) so the caller can set position
+//          styles before the browser scrolls to the newly focused element.
 // ---------------------------------------------------------------------------
 
 import { META_LABELS } from './filter-engine.js';
@@ -107,10 +109,13 @@ export class Dropdown {
         container.appendChild(root);
         this._root = root;
 
-        // Focus the quick filter input for keyboard-first use
+        // Defer focus until the caller has had a chance to set position styles.
+        // Without deferral the browser scrolls to show the un-positioned element
+        // (which is appended at the end of the document body) before the caller
+        // can place it near the badge button.
         const input = root.querySelector(`.${C.QUICK_INPUT}`);
         if (input instanceof HTMLElement) {
-            input.focus();
+            setTimeout(() => input.focus(), 0);
         }
 
         return root;

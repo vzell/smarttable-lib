@@ -3,7 +3,7 @@
  * @description Shared type definitions and JSDoc typedefs for smarttable-lib.
  *   All public APIs are typed via JSDoc so consumers get IDE intellisense
  *   without requiring a TypeScript build step.
- * @version 1.3.0
+ * @version 1.4.0
  */
 
 // ---------------------------------------------------------------------------
@@ -16,6 +16,7 @@
 // 1.2.0 — ColumnDef gains render callback for custom cell DOM output.
 // 1.3.0 — ColumnFilter gains isRegex; when false the regex field is treated as
 //          a literal substring (escaped before pattern compilation).
+// 1.4.0 — FilterState gains globalIsRegex (default false = literal matching).
 // ---------------------------------------------------------------------------
 
 /**
@@ -123,6 +124,8 @@
  *
  * @typedef {Object} FilterState
  * @property {string}         globalRegex        - Global regex string (may be empty).
+ * @property {boolean}        [globalIsRegex=false] - If false (default), globalRegex is escaped
+ *                                                 and matched literally. If true, compiled as RegExp.
  * @property {boolean}        globalRegexExclude - If true, global regex excludes matches.
  * @property {boolean}        globalRegexCase    - If true, global regex is case-sensitive.
  * @property {ColumnFilter[]} columnFilters      - Per-column filter descriptors.

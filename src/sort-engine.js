@@ -4,7 +4,7 @@
  *   tracking for shading. Comparators are dispatched by ColumnDef.type.
  *   Shading state is maintained across renders so the renderer can diff
  *   old vs new positions and apply CSS transition classes.
- * @version 1.0.1
+ * @version 1.1.0
  */
 
 // ---------------------------------------------------------------------------
@@ -18,6 +18,10 @@
 //          getShadingClass() to short-circuit (undefined check). Fix: seed
 //          _currValues from the pre-sort positions for any column not yet
 //          tracked before copying into _prevValues.
+// 1.1.0 — pushSort(colKey, direction?) accepts an explicit direction param so
+//          ▲/▼ buttons set direction directly instead of cycling. Export
+//          SUPERSCRIPT_DIGITS array. sort() compiles a single comparator
+//          closure before Array.sort() to avoid per-pair stack traversal.
 // ---------------------------------------------------------------------------
 
 /**
@@ -25,6 +29,13 @@
  * @typedef {import('./types.js').NormalizedRow} NormalizedRow
  * @typedef {import('./types.js').SortEntry}    SortEntry
  */
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Unicode superscript digits 1–9 for sort-priority labels on active buttons. */
+export const SUPERSCRIPT_DIGITS = ['¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
 // ---------------------------------------------------------------------------
 // Comparators by type
@@ -94,21 +105,25 @@ export class SortEngine {
     // -------------------------------------------------------------------------
 
     /**
-     * Pushes a sort entry onto the stack (or flips direction if already present).
-     * Called when the user clicks a column header.
+     * Pushes a sort entry onto the stack (or updates an existing one).
+     * When `direction` is provided, that direction is applied directly; when
+     * omitted the direction cycles (legacy label-click behaviour).
      *
-     * @param {string} colKey
+     * @param {string}           colKey
+     * @param {'asc'|'desc'}     [direction] - Explicit direction; omit to cycle.
      * @returns {SortEntry[]} Updated sort stack.
      */
-    pushSort(colKey) {
+    pushSort(colKey, direction) {
         const existing = this._stack.findIndex(e => e.colKey === colKey);
         if (existing !== -1) {
             const entry = this._stack[existing];
-            entry.direction = entry.direction === 'asc' ? 'desc' : 'asc';
+            entry.direction = direction !== undefined
+                ? direction
+                : (entry.direction === 'asc' ? 'desc' : 'asc');
         } else {
             this._stack.push({
                 colKey,
-                direction: 'asc',
+                direction: direction ?? 'asc',
                 priority: this._stack.length,
             });
         }
@@ -150,6 +165,8 @@ export class SortEngine {
 
     /**
      * Sorts an array of row indices according to the current sort stack.
+     * The sort stack is compiled into a single comparator closure before
+     * Array.sort() runs to avoid per-pair stack traversal.
      * Also snapshots current cell values for shading comparison on the
      * next render cycle.
      *
@@ -177,18 +194,22 @@ export class SortEngine {
         // Snapshot current → becomes previous before we re-sort
         this._prevValues = new Map(this._currValues);
 
+        // Compile sort stack snapshot into a single comparator closure so
+        // Array.sort() does not access this._stack on every row-pair comparison.
+        const stack = this._stack.map(entry => ({
+            colKey:    entry.colKey,
+            direction: entry.direction,
+            cmp:       COMPARATORS[this._defs.get(entry.colKey)?.type ?? 'string'] ?? COMPARATORS.string,
+        }));
+
         const sorted = rowIdxs.slice().sort((ai, bi) => {
-            for (const entry of this._stack) {
-                const def  = this._defs.get(entry.colKey);
-                const type = def?.type ?? 'string';
-                const cmp  = COMPARATORS[type] ?? COMPARATORS.string;
-
-                const aText = this._cellText(rows[ai], entry.colKey);
-                const bText = this._cellText(rows[bi], entry.colKey);
-
-                const result = cmp(aText, bText);
+            for (const { colKey, direction, cmp } of stack) {
+                const result = cmp(
+                    this._cellText(rows[ai], colKey),
+                    this._cellText(rows[bi], colKey),
+                );
                 if (result !== 0) {
-                    return entry.direction === 'asc' ? result : -result;
+                    return direction === 'asc' ? result : -result;
                 }
             }
             return 0;

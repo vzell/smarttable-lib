@@ -16,7 +16,7 @@
  *   Requires table-layout:fixed on the <table> element once any explicit
  *   width has been set; the engine sets this automatically.
  *
- * @version 1.0.1
+ * @version 1.4.0
  */
 
 // ---------------------------------------------------------------------------
@@ -30,6 +30,17 @@
 // 1.0.1 — attach() now calls _applyWidths() after _ensureColgroup() so that
 //         stored widths survive table-renderer re-renders (which replace thead
 //         and tbody but keep the same table element and ResizeEngine instance).
+// 1.1.0 — HEADER_CHROME_PX increased from 56 to 90 to budget for the
+//         three-zone header (sort icons + collapse toggle + 📊 badge).
+// 1.2.0 — resetWidths() public method: clears all stored widths and reverts
+//         table to table-layout:auto (used by the Auto-size toggle button).
+// 1.3.0 — HEADER_CHROME_PX increased from 90 to 120 so short-label columns
+//         (Date, MM, DD) always show their full column name after auto-size.
+//         Added COLLAPSE_CHROME_PX = 70 for the centre-zone collapse toggle;
+//         autoResize() adds it when ColumnDef.collapsible is set.
+// 1.4.0 — MAX_MEASURE_ROWS = 300: autoResize() now samples at most 300
+//         display rows to prevent synchronous offsetWidth-reflow hangs on
+//         large datasets (e.g. jungleland.it with 5000+ bootleg entries).
 // ---------------------------------------------------------------------------
 
 /**
@@ -50,8 +61,28 @@ const DEFAULT_MIN_WIDTH = 60;
 /** Extra padding added to measured text width (accounts for cell padding). */
 const CELL_PADDING_PX = 24;
 
-/** Extra width budget for header badges (sort indicator + collapse badge + filter button). */
-const HEADER_CHROME_PX = 56;
+/**
+ * Extra width budget added to the measured column-label text to arrive at the
+ * minimum header width. Covers: 3 sort-icon buttons (~42 px at 11 px font) +
+ * left-zone gaps (~12 px) + 📊 badge (~46 px) + inter-zone gap (6 px) = ~106 px.
+ * Set to 120 px to leave a comfortable buffer for varying host-page font metrics.
+ */
+const HEADER_CHROME_PX = 120;
+
+/**
+ * Extra width budget for the centre-zone collapse toggle (▶/N/▤ or ◀/N/▤)
+ * present only in collapsible columns: toggle widget (~56 px) + zone gap (6 px).
+ */
+const COLLAPSE_CHROME_PX = 70;
+
+/**
+ * Maximum number of display rows sampled during autoResize().
+ * Each measurement forces a synchronous browser layout reflow (offsetWidth).
+ * Capping at 300 keeps auto-resize fast even on large datasets (jungleland.it
+ * has 5000+ entries; uncapped that would be 35 000 reflows → visible hang).
+ * The first 300 rows are a good statistical sample for finding the widest cell.
+ */
+const MAX_MEASURE_ROWS = 300;
 
 /** Drag states. */
 const STATE = /** @type {const} */ ({
@@ -156,15 +187,23 @@ export class ResizeEngine {
         const tableStyle = window.getComputedStyle(this._tableEl);
         this._ruler.style.font = tableStyle.font;
 
+        // Cap the sample to avoid thousands of synchronous offsetWidth reflows
+        // on large datasets.  First MAX_MEASURE_ROWS rows are a reliable sample
+        // for finding the widest content in most real-world datasets.
+        const sampleRows = displayRows.length > MAX_MEASURE_ROWS
+            ? displayRows.slice(0, MAX_MEASURE_ROWS)
+            : displayRows;
+
         for (const def of this._defs) {
             const minW = def.minWidth ?? DEFAULT_MIN_WIDTH;
             const maxW = def.maxWidth ?? Infinity;
 
-            // Measure header text + chrome (badges, icons)
-            let maxPx = this._measureText(def.label) + HEADER_CHROME_PX;
+            // Measure header text + chrome (sort icons, badge, optional collapse toggle)
+            const collapseExtra = def.collapsible ? COLLAPSE_CHROME_PX : 0;
+            let maxPx = this._measureText(def.label) + HEADER_CHROME_PX + collapseExtra;
 
-            // Measure every visible cell's sub-rows
-            for (const row of displayRows) {
+            // Measure sampled cell sub-rows
+            for (const row of sampleRows) {
                 const subRows = this._subRows(row, def.key);
                 for (const text of subRows) {
                     const w = this._measureText(text) + CELL_PADDING_PX;
@@ -266,6 +305,25 @@ export class ResizeEngine {
         const maxW = def?.maxWidth ?? Infinity;
         this._widths.set(colKey, Math.min(Math.max(widthPx, minW), maxW));
         this._applyWidths();
+    }
+
+    /**
+     * Clears all stored column widths and reverts the table to
+     * table-layout:auto so the browser recomputes natural widths.
+     * Used by the Auto-size toggle button to restore the initial layout.
+     *
+     * @returns {void}
+     */
+    resetWidths() {
+        this._widths.clear();
+        if (this._tableEl) {
+            this._tableEl.style.tableLayout = 'auto';
+        }
+        if (this._colEls) {
+            for (const col of this._colEls) {
+                col.style.width = '';
+            }
+        }
     }
 
     // -------------------------------------------------------------------------

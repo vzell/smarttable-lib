@@ -7,7 +7,7 @@
  *     1. inject() — create table skeleton + inject trigger button on the page
  *     2. render() — build thead/tbody from current data + filter/sort/collapse state
  *     3. re-render() — called after any state change (filter, sort, collapse toggle)
- * @version 1.5.0
+ * @version 1.6.4
  */
 
 // ---------------------------------------------------------------------------
@@ -21,47 +21,58 @@
 // 1.1.0 — column resize support
 //         ResizeEngine integrated: <colgroup> management, off-screen ruler,
 //         drag-to-resize on header border, auto-resize global button.
-//         _rerender() re-attaches ResizeEngine after thead replacement.
-//         _buildGlobalBar() gains "Auto-size columns" button.
 // 1.2.0 — derived column support
-//         _expandRow() pre-computes ColumnDef.derive(sourceValue) values into
-//         each row at construction time so sort/filter/collapse see them.
-// 1.3.2 — ColumnDef.render callback support
-//         _makeSubrow() accepts (text, hidden, col, row); if col.render is set,
-//         its return value is appended as a Node or set as textContent.
-//         Sort and filter are unaffected — they use raw data values only.
-// 1.3.1 — set type="button" on every created <button> element so none of them
-//         accidentally submit a host-page <form> (HTML default is type="submit").
-// 1.3.0 — complete ResizeEngine wiring
-//         _buildWrapper(): attach ResizeEngine after table enters DOM; apply
-//           initial col.width values via setColWidth() (not th.style.width).
-//         _buildGlobalBar(): "Auto-size columns" button added.
-//         _buildTh(): attachDragHandlers() called per column; th.style.width
-//           removed (invariant: widths via <col> only, never on <th>/<td>).
-//         _rerender(): re-attach ResizeEngine so colgroup tracks new thead.
+//         _expandRow() pre-computes ColumnDef.derive(sourceValue) values.
+// 1.3.x — ColumnDef.render callback; permanent filter row; match highlighting;
+//          full ResizeEngine wiring; type="button" on every created button.
 // 1.4.0 — permanent filter row + match highlighting
-//         _buildThead() now produces two rows: column headers + filter row.
-//         _buildHeaderRow() extracted from old _buildThead() body.
-//         _buildFilterRow() adds a text input + regex toggle per filterable column.
-//         Typing in the filter row updates ColumnFilter.regex; the .* button
-//         toggles ColumnFilter.isRegex. Focus and cursor are restored after
-//         each re-render so typing feels seamless.
-//         _buildTbody() pre-computes highlight patterns; _makeSubrow() wraps
-//         matches in <mark class="st-highlight"> via _applyHighlight().
-//         Cells with a col.render callback are not highlighted.
-//         stickyHeader inline styles moved from _buildTable() into _buildThead().
-// 1.5.0 — value-group shading replaces position-change flash shading
-//         Each <tr> gets st-shade-a or st-shade-b based on the primary sort
-//         column's value. Consecutive rows sharing the same value share a shade
-//         group; the group alternates whenever the value changes. This produces
-//         persistent visible banding (e.g. all 1966 rows tinted, all 1967 rows
-//         white) regardless of whether sorting changed row order. The old
-//         per-<td> st-shading-changed setTimeout flash is removed.
+// 1.5.0 — value-group shading (st-shade-a/b) replaces position-change flash.
+// 1.6.2 — Bug fixes: (1) sort icons wrapped in st-sort-icons group so ⇅▲▼
+//          render with no gap between them; (2) dropdown re-positioned using
+//          position:absolute + scrollX/Y so it anchors to the badge on pages
+//          with CSS transform on ancestors (which breaks position:fixed).
+// 1.6.4 — Bug fix: _buildTh() adds st-th-inner--collapsible modifier class only
+//          on collapsible columns so the CSS grid (1fr auto 1fr) for centred
+//          toggle is not applied to non-collapsible columns (which would cause
+//          the left zone to lose half its space and clip the column label).
+// 1.6.3 — Bug fixes: (1) Toggle highlights button text changes between
+//          "Hide highlights" / "Show highlights" to reflect current state.
+//          (2) Cell collapse toggle is now inline with the FIRST sub-row
+//          (inside st-cell-first-row flex wrapper) instead of a separate row
+//          below all content.
+//          (3) ▲/▼ sort click now clears the entire sort stack before adding
+//          the clicked column; Shift+click retains multi-sort behaviour.
+//          (4) _makeSortIcon() forwards the MouseEvent to the callback.
+// 1.6.1 — Bug fixes: (1) auto-size on initial render so headers always show
+//          optimal widths; (2) Auto-size button is now a toggle between optimal
+//          widths and natural browser widths; (3) all interactive elements have
+//          descriptive, state-aware title (tooltip) attributes; (4) dropdown
+//          positioned via position:fixed + viewport coords so viewport never
+//          jumps when opening the 📊 unique-values dropdown.
+// 1.6.0 — ShowAllEntityData-inspired UI overhaul:
+//          Three-zone header flex layout (st-th-inner / left / centre / right).
+//          Three sort-icon buttons per header (⇅ ▲ ▼); active button gets
+//          st-sort-icon-active + Unicode superscript priority; ⇅ removes column.
+//          Per-priority per-column TD shading (st-mscol-{P}a/b) replaces old
+//          TR-level st-shade-a / st-shade-b. Header TH tinted by priority.
+//          {count}📊 badge (st-uniq-badge) in right zone replaces ⧨/⧩ button.
+//          Collapse toggle moved to centre zone; glyph format ▶/N/▤ / ◀/N/▤.
+//          Data cell toggle moved to bottom-right flex row (st-cell-toggle-row).
+//          Event delegation on <table> for all cell-toggle clicks (one listener).
+//          Cc/Rx/Ex checkbox modifiers on global bar and per-column filter row.
+//          ✕ clear button + Escape key on all filter inputs.
+//          Four toolbar action buttons: Expand/Collapse ALL, Toggle HL,
+//          Clear ALL column filters, Clear ALL filters.
+//          DocumentFragment batching in _buildTbody().
+//          _applyHighlight() two-color: st-highlight (global) vs st-col-highlight
+//          (column); character-level Uint8Array marks global-wins priority.
+//          FilterState.globalIsRegex respected (default false = literal).
+//          st-wrapper.st-no-highlight CSS hook hides marks without rerender.
 // ---------------------------------------------------------------------------
 
 import { CollapseEngine }                          from './collapse-engine.js';
 import { FilterEngine, buildHighlightPattern }     from './filter-engine.js';
-import { SortEngine }                              from './sort-engine.js';
+import { SortEngine, SUPERSCRIPT_DIGITS }          from './sort-engine.js';
 import { Dropdown, emptyColumnFilter }             from './dropdown.js';
 import { inspectCell }                             from './cell-inspector.js';
 import { ResizeEngine }                            from './resize-engine.js';
@@ -83,10 +94,7 @@ const C = {
     THEAD:          'st-thead',
     TH:             'st-th',
     TH_LABEL:       'st-th-label',
-    TH_SORT_BADGE:  'st-th-sort-badge',
-    TH_SORT_DIR:    'st-th-sort-dir',
     TH_COLLAPSE:    'st-th-collapse',
-    TH_FILTER_BTN:  'st-th-filter-btn',
     TBODY:          'st-tbody',
     TR:             'st-tr',
     TD:             'st-td',
@@ -94,19 +102,28 @@ const C = {
     SUBROW:         'st-subrow',
     SUBROW_HIDDEN:  'st-subrow--hidden',
     CELL_TOGGLE:    'st-cell-toggle',
-    SHADE_A:        'st-shade-a',
-    SHADE_B:        'st-shade-b',
     FILTER_ACTIVE:  'st-th--filter-active',
     SORT_ACTIVE:    'st-th--sort-active',
-    BTN_TRIGGER:      'st-btn-trigger',
-    BTN_AUTO_RESIZE:  'st-btn-auto-resize',
-    WRAPPER:          'st-wrapper',
-    GLOBAL_BAR:       'st-global-bar',
-    FILTER_ROW:       'st-filter-row',
-    FILTER_TH:        'st-filter-th',
-    FILTER_INPUT:     'st-filter-input',
-    FILTER_REGEX_BTN: 'st-filter-regex-btn',
+    BTN_TRIGGER:    'st-btn-trigger',
+    BTN_AUTO_RESIZE:'st-btn-auto-resize',
+    WRAPPER:        'st-wrapper',
+    GLOBAL_BAR:     'st-global-bar',
+    FILTER_ROW:     'st-filter-row',
+    FILTER_TH:      'st-filter-th',
+    FILTER_INPUT:   'st-filter-input',
 };
+
+// 8 hue pairs for per-priority TD tinting (a = 0.22 α, b = 0.44 α)
+const SHADE_PAIRS = [
+    ['st-mscol-0a', 'st-mscol-0b'],
+    ['st-mscol-1a', 'st-mscol-1b'],
+    ['st-mscol-2a', 'st-mscol-2b'],
+    ['st-mscol-3a', 'st-mscol-3b'],
+    ['st-mscol-4a', 'st-mscol-4b'],
+    ['st-mscol-5a', 'st-mscol-5b'],
+    ['st-mscol-6a', 'st-mscol-6b'],
+    ['st-mscol-7a', 'st-mscol-7b'],
+];
 
 export class TableRenderer {
     /**
@@ -131,12 +148,13 @@ export class TableRenderer {
         this._filter   = new FilterEngine(columns);
         this._resize   = new ResizeEngine(columns);
 
-        // Pre-compute derived column values so all engines (sort, filter, collapse) see them
+        // Pre-compute derived column values so all engines see them
         this._rows = rows.map(row => this._expandRow(row));
 
         /** @type {FilterState} */
         this._filterState = {
             globalRegex:        '',
+            globalIsRegex:      false,
             globalRegexExclude: false,
             globalRegexCase:    false,
             columnFilters:      columns.map(c => emptyColumnFilter(c.key)),
@@ -153,6 +171,28 @@ export class TableRenderer {
 
         /** Current sorted+filtered indices (display order) */
         this._displayIdxs = this._allIdxs.slice();
+
+        // DOM references for the persistent global bar controls
+        /** @type {HTMLInputElement|null} */
+        this._globalInput = null;
+        /** @type {HTMLInputElement|null} */
+        this._globalCcCb = null;
+        /** @type {HTMLInputElement|null} */
+        this._globalRxCb = null;
+        /** @type {HTMLInputElement|null} */
+        this._globalExCb = null;
+        /** @type {HTMLButtonElement|null} */
+        this._autoSizeBtn = null;
+        /** True when optimal column widths are currently applied. */
+        this._autoSized = false;
+
+        // Pre-compute unique value counts (stable — rows never change after construction)
+        /** @type {Map<string, number>} */
+        this._uniqueCounts = new Map(
+            columns
+                .filter(c => c.filterable !== false)
+                .map(c => [c.key, this._filter.buildUniqueValues(this._rows, c.key).length])
+        );
 
         this._initEngines();
     }
@@ -180,14 +220,12 @@ export class TableRenderer {
 
     /**
      * Injects the trigger button into the host page and renders the table.
-     * The trigger button is appended to this._container; the table wrapper
-     * is inserted after the button.
      *
      * @returns {void}
      */
     inject() {
         const btn = document.createElement('button');
-        btn.type = 'button'; // prevent form submission when injected inside a <form>
+        btn.type = 'button';
         btn.className = C.BTN_TRIGGER;
         btn.textContent = 'Show table';
         btn.addEventListener('click', () => {
@@ -206,7 +244,6 @@ export class TableRenderer {
 
     /**
      * Destroys the table wrapper and cleans up event listeners.
-     * The trigger button is left in place so the user can re-render.
      *
      * @returns {void}
      */
@@ -234,10 +271,27 @@ export class TableRenderer {
         this._container.appendChild(wrapper);
         this._wrapper = wrapper;
 
-        // Attach after wrapper is in the DOM so the ruler inherits CSS context
+        // Single delegated listener on the table for ALL cell-toggle clicks.
+        // Lives on this._tableEl (not tbody) so it survives rerenders.
+        this._tableEl.addEventListener('click', (e) => {
+            const btn = /** @type {HTMLElement|null} */ (
+                e.target instanceof HTMLElement
+                    ? e.target.closest(`.${C.CELL_TOGGLE}`)
+                    : null
+            );
+            if (!btn) return;
+            const colKey  = btn.dataset.colkey;
+            const origIdx = parseInt(btn.dataset.origidx ?? '', 10);
+            if (colKey && !isNaN(origIdx)) {
+                this._collapse.toggleCell(colKey, origIdx);
+                this._rerender();
+            }
+        });
+
+        // Attach after wrapper is in DOM so ruler inherits CSS context
         this._resize.attach(this._tableEl);
 
-        // Seed any initial widths declared on column definitions
+        // Seed any explicit widths declared on column definitions
         for (const col of this._columns) {
             if (col.width) {
                 const px = parseFloat(col.width);
@@ -246,10 +300,20 @@ export class TableRenderer {
                 }
             }
         }
+
+        // Auto-size immediately so every column starts at optimal width
+        const displayRows = this._displayIdxs.map(i => this._rows[i]);
+        this._resize.autoResize(this._rows, displayRows);
+        this._autoSized = true;
+        if (this._autoSizeBtn) {
+            this._autoSizeBtn.textContent = 'Reset width';
+            this._autoSizeBtn.title = 'Revert to natural column widths (browser-computed)';
+        }
     }
 
     /**
-     * Builds the global regex filter bar shown above the table.
+     * Builds the global filter bar shown above the table.
+     * Stores checkbox DOM references on `this` for later reset operations.
      *
      * @returns {HTMLElement}
      */
@@ -257,19 +321,27 @@ export class TableRenderer {
         const bar = document.createElement('div');
         bar.className = C.GLOBAL_BAR;
 
+        // ---- Input + inset ✕ ----
+        const inputWrap = document.createElement('div');
+        inputWrap.className = 'st-input-wrap';
+
         const input = document.createElement('input');
         input.type = 'text';
-        input.placeholder = 'Global filter (regex)…';
+        input.placeholder = 'Filter…';
         input.className = 'st-global-input';
-        input.setAttribute('aria-label', 'Global regex filter');
+        input.setAttribute('aria-label', 'Global filter');
+        input.title = 'Filter all columns — press Escape to clear';
+        input.value = this._filterState.globalRegex;
+        this._globalInput = input;
 
-        const excludeToggle = this._makeToggle('Exclude', false, (val) => {
-            this._filterState.globalRegexExclude = val;
-            this._rerender();
-        });
-
-        const caseToggle = this._makeToggle('Case', false, (val) => {
-            this._filterState.globalRegexCase = val;
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'st-clear-btn';
+        clearBtn.textContent = '✕';
+        clearBtn.title = 'Clear global filter';
+        clearBtn.addEventListener('click', () => {
+            input.value = '';
+            this._filterState.globalRegex = '';
             this._rerender();
         });
 
@@ -278,19 +350,143 @@ export class TableRenderer {
             this._rerender();
         });
 
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                input.value = '';
+                this._filterState.globalRegex = '';
+                this._rerender();
+            }
+        });
+
+        inputWrap.appendChild(input);
+        inputWrap.appendChild(clearBtn);
+
+        // ---- Cc / Rx / Ex checkboxes ----
+        const { element: ccEl, checkbox: ccCb } = this._makeCheckbox(
+            'Cc', 'Case-sensitive matching — when checked, uppercase and lowercase are treated as distinct',
+            this._filterState.globalRegexCase,
+            (val) => { this._filterState.globalRegexCase = val; this._rerender(); }
+        );
+        this._globalCcCb = ccCb;
+
+        const { element: rxEl, checkbox: rxCb } = this._makeCheckbox(
+            'Rx', 'Regex mode — when checked, the filter text is compiled as a JavaScript regular expression; when unchecked, it is matched literally',
+            this._filterState.globalIsRegex ?? false,
+            (val) => { this._filterState.globalIsRegex = val; this._rerender(); }
+        );
+        this._globalRxCb = rxCb;
+
+        const { element: exEl, checkbox: exCb } = this._makeCheckbox(
+            'Ex', 'Exclude mode — when checked, rows that match the filter are hidden instead of shown',
+            this._filterState.globalRegexExclude,
+            (val) => { this._filterState.globalRegexExclude = val; this._rerender(); }
+        );
+        this._globalExCb = exCb;
+
+        // ---- Auto-size toggle button ----
         const autoSizeBtn = document.createElement('button');
         autoSizeBtn.type = 'button';
         autoSizeBtn.className = C.BTN_AUTO_RESIZE;
-        autoSizeBtn.textContent = 'Auto-size columns';
+        autoSizeBtn.textContent = 'Auto-size';
+        autoSizeBtn.title = 'Fit each column to its widest content';
+        this._autoSizeBtn = autoSizeBtn;
         autoSizeBtn.addEventListener('click', () => {
-            const displayRows = this._displayIdxs.map(i => this._rows[i]);
-            this._resize.autoResize(this._rows, displayRows);
+            if (this._autoSized) {
+                this._resize.resetWidths();
+                this._autoSized = false;
+                autoSizeBtn.textContent = 'Auto-size';
+                autoSizeBtn.title = 'Fit each column to its widest content';
+            } else {
+                const displayRows = this._displayIdxs.map(i => this._rows[i]);
+                this._resize.autoResize(this._rows, displayRows);
+                this._autoSized = true;
+                autoSizeBtn.textContent = 'Reset width';
+                autoSizeBtn.title = 'Revert to natural column widths (browser-computed)';
+            }
         });
 
-        bar.appendChild(input);
-        bar.appendChild(excludeToggle);
-        bar.appendChild(caseToggle);
+        // ---- Expand / Collapse ALL ----
+        const expandAllBtn = document.createElement('button');
+        expandAllBtn.type = 'button';
+        expandAllBtn.className = 'st-btn-expand-all';
+        const _updateExpandBtn = () => {
+            const collapsed = this._anyCollapsed();
+            expandAllBtn.textContent = collapsed ? 'Expand all' : 'Collapse all';
+            expandAllBtn.title = collapsed
+                ? 'Expand all multi-row cells in every collapsible column'
+                : 'Collapse all multi-row cells in every collapsible column';
+        };
+        _updateExpandBtn();
+        expandAllBtn.addEventListener('click', () => {
+            const shouldExpand = this._anyCollapsed();
+            const wantCollapsed = !shouldExpand;
+            for (const col of this._columns) {
+                if (!col.collapsible) continue;
+                const state = this._collapse.getState(col.key);
+                if (state && state.columnCollapsed !== wantCollapsed) {
+                    this._collapse.toggleColumn(col.key);
+                }
+            }
+            _updateExpandBtn();
+            this._rerender();
+        });
+
+        // ---- Toggle ALL highlighting ----
+        const toggleHlBtn = document.createElement('button');
+        toggleHlBtn.type = 'button';
+        toggleHlBtn.className = 'st-btn-toggle-hl';
+        const _updateHlBtn = (hidden) => {
+            toggleHlBtn.textContent = hidden ? 'Show highlights' : 'Hide highlights';
+            toggleHlBtn.title = hidden
+                ? 'Highlights are hidden — click to show match marks again'
+                : 'Hide all filter match highlights without re-running the filter';
+        };
+        _updateHlBtn(false);  // initial: highlights on
+        toggleHlBtn.addEventListener('click', () => {
+            this._wrapper?.classList.toggle('st-no-highlight');
+            _updateHlBtn(this._wrapper?.classList.contains('st-no-highlight') ?? false);
+        });
+
+        // ---- Clear ALL column filters ----
+        const clearColBtn = document.createElement('button');
+        clearColBtn.type = 'button';
+        clearColBtn.className = 'st-btn-clear-col-filters';
+        clearColBtn.textContent = 'Clear col filters';
+        clearColBtn.title = 'Reset every column-level filter input and dropdown selection';
+        clearColBtn.addEventListener('click', () => {
+            this._filterState.columnFilters = this._columns.map(c => emptyColumnFilter(c.key));
+            this._rerender();
+        });
+
+        // ---- Clear ALL filters ----
+        const clearAllBtn = document.createElement('button');
+        clearAllBtn.type = 'button';
+        clearAllBtn.className = 'st-btn-clear-all-filters';
+        clearAllBtn.textContent = 'Clear all filters';
+        clearAllBtn.title = 'Reset all filters — global input, Cc/Rx/Ex checkboxes, and all column filters';
+        clearAllBtn.addEventListener('click', () => {
+            this._filterState.globalRegex        = '';
+            this._filterState.globalIsRegex      = false;
+            this._filterState.globalRegexCase    = false;
+            this._filterState.globalRegexExclude = false;
+            this._filterState.columnFilters      = this._columns.map(c => emptyColumnFilter(c.key));
+            // Reset the persistent global bar controls directly
+            if (this._globalInput)  this._globalInput.value  = '';
+            if (this._globalCcCb)   this._globalCcCb.checked = false;
+            if (this._globalRxCb)   this._globalRxCb.checked = false;
+            if (this._globalExCb)   this._globalExCb.checked = false;
+            this._rerender();
+        });
+
+        bar.appendChild(inputWrap);
+        bar.appendChild(ccEl);
+        bar.appendChild(rxEl);
+        bar.appendChild(exEl);
         bar.appendChild(autoSizeBtn);
+        bar.appendChild(expandAllBtn);
+        bar.appendChild(toggleHlBtn);
+        bar.appendChild(clearColBtn);
+        bar.appendChild(clearAllBtn);
         return bar;
     }
 
@@ -340,7 +536,6 @@ export class TableRenderer {
 
     /**
      * Builds the primary header <tr> with one <th> per column.
-     * Extracted from the old _buildThead() body.
      *
      * @returns {HTMLTableRowElement}
      */
@@ -353,8 +548,8 @@ export class TableRenderer {
     }
 
     /**
-     * Builds the permanent filter row: a second <tr> in <thead> with a text
-     * input per filterable column. Each input also has a regex toggle button.
+     * Builds the permanent filter row: a second <tr> in <thead> with a text input,
+     * Cc/Rx/Ex checkboxes, and ✕/Escape clear per filterable column.
      *
      * @returns {HTMLTableRowElement}
      */
@@ -369,12 +564,30 @@ export class TableRenderer {
             if (col.filterable !== false) {
                 const cf = this._getColumnFilter(col.key);
 
+                // Input + ✕ wrap
+                const inputWrap = document.createElement('div');
+                inputWrap.className = 'st-input-wrap';
+
                 const input = document.createElement('input');
                 input.type = 'text';
                 input.className = C.FILTER_INPUT;
                 input.dataset.colkey = col.key;
                 input.placeholder = col.label;
+                input.title = `Filter ${col.label} — press Escape to clear`;
                 input.value = cf.regex;
+
+                const colClearBtn = document.createElement('button');
+                colClearBtn.type = 'button';
+                colClearBtn.className = 'st-clear-btn';
+                colClearBtn.textContent = '✕';
+                colClearBtn.title = `Clear ${col.label} filter`;
+                colClearBtn.addEventListener('click', () => {
+                    this._setColumnFilter({
+                        ...this._getColumnFilter(col.key),
+                        regex: '',
+                    });
+                    this._rerender();
+                });
 
                 input.addEventListener('input', () => {
                     const sel = [input.selectionStart, input.selectionEnd];
@@ -392,23 +605,65 @@ export class TableRenderer {
                     }
                 });
 
-                const regexBtn = document.createElement('button');
-                regexBtn.type = 'button';
-                regexBtn.className = C.FILTER_REGEX_BTN;
-                regexBtn.textContent = '.*';
-                regexBtn.title = 'Toggle regex mode';
-                regexBtn.dataset.active = String(cf.isRegex ?? false);
-
-                regexBtn.addEventListener('click', () => {
-                    this._setColumnFilter({
-                        ...this._getColumnFilter(col.key),
-                        isRegex: !(this._getColumnFilter(col.key).isRegex ?? false),
-                    });
-                    this._rerender();
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        this._setColumnFilter({
+                            ...this._getColumnFilter(col.key),
+                            regex: '',
+                        });
+                        this._rerender();
+                    }
                 });
 
-                th.appendChild(input);
-                th.appendChild(regexBtn);
+                inputWrap.appendChild(input);
+                inputWrap.appendChild(colClearBtn);
+
+                // Cc / Rx / Ex modifier checkboxes
+                const mods = document.createElement('div');
+                mods.className = 'st-filter-mods';
+
+                const { element: ccEl } = this._makeCheckbox(
+                    'Cc', `Case-sensitive — when checked, ${col.label} filter distinguishes uppercase from lowercase`,
+                    cf.regexCase ?? false,
+                    (val) => {
+                        this._setColumnFilter({
+                            ...this._getColumnFilter(col.key),
+                            regexCase: val,
+                        });
+                        this._rerender();
+                    }
+                );
+
+                const { element: rxEl } = this._makeCheckbox(
+                    'Rx', `Regex mode — when checked, ${col.label} filter text is compiled as a JavaScript regular expression`,
+                    cf.isRegex ?? false,
+                    (val) => {
+                        this._setColumnFilter({
+                            ...this._getColumnFilter(col.key),
+                            isRegex: val,
+                        });
+                        this._rerender();
+                    }
+                );
+
+                const { element: exEl } = this._makeCheckbox(
+                    'Ex', `Exclude mode — when checked, rows matching the ${col.label} filter are hidden`,
+                    cf.regexExclude ?? false,
+                    (val) => {
+                        this._setColumnFilter({
+                            ...this._getColumnFilter(col.key),
+                            regexExclude: val,
+                        });
+                        this._rerender();
+                    }
+                );
+
+                mods.appendChild(ccEl);
+                mods.appendChild(rxEl);
+                mods.appendChild(exEl);
+
+                th.appendChild(inputWrap);
+                th.appendChild(mods);
             }
 
             tr.appendChild(th);
@@ -418,8 +673,8 @@ export class TableRenderer {
     }
 
     /**
-     * Builds a single <th> element for a column header.
-     * Contains: label | sort badge | collapse badge | filter button.
+     * Builds a single <th> element using the three-zone flex layout.
+     * Left: column label + sort icons. Centre: collapse toggle. Right: 📊 badge.
      *
      * @param {ColumnDef} col
      * @returns {HTMLTableCellElement}
@@ -428,78 +683,146 @@ export class TableRenderer {
         const th = document.createElement('th');
         th.className = C.TH;
 
-        // Label
-        const label = document.createElement('span');
-        label.className = C.TH_LABEL;
-        label.textContent = col.label;
-        th.appendChild(label);
+        const sortStack  = this._sort.getStack();
+        const sortEntry  = sortStack.find(e => e.colKey === col.key);
+        const cf         = this._getColumnFilter(col.key);
+        const hasFilter  = cf.metaEntries.length > 0
+            || cf.valueEntries.length > 0
+            || cf.regex.trim() !== '';
 
-        // Sort badge (priority number + direction arrow)
-        const sortEntry = this._sort.getStack().find(e => e.colKey === col.key);
         if (sortEntry) {
-            const badge = document.createElement('span');
-            badge.className = C.TH_SORT_BADGE;
-            badge.textContent = `${sortEntry.priority + 1}`;
-            th.appendChild(badge);
-
-            const dir = document.createElement('span');
-            dir.className = C.TH_SORT_DIR;
-            dir.textContent = sortEntry.direction === 'asc' ? ' ▲' : ' ▼';
-            th.appendChild(dir);
-
             th.classList.add(C.SORT_ACTIVE);
+            if (this._options.shadingEnabled !== false) {
+                th.classList.add(`st-mscol-hdr-${sortEntry.priority % 8}`);
+            }
         }
+        if (hasFilter) th.classList.add(C.FILTER_ACTIVE);
 
-        // Sort click handler
+        // Three-zone container: grid for collapsible columns (centres the toggle),
+        // plain flex for all others (left zone gets the full remaining width)
+        const inner = document.createElement('div');
+        inner.className = col.collapsible
+            ? 'st-th-inner st-th-inner--collapsible'
+            : 'st-th-inner';
+
+        // ---- LEFT zone: label + sort icons ----
+        const left = document.createElement('div');
+        left.className = 'st-th-left';
+
+        const labelEl = document.createElement('span');
+        labelEl.className = C.TH_LABEL;
+        labelEl.textContent = col.label;
+        left.appendChild(labelEl);
+
         if (col.sortable !== false) {
-            label.style.cursor = 'pointer';
-            label.addEventListener('click', () => {
-                this._sort.pushSort(col.key);
+            const priSuffix = sortEntry
+                ? (SUPERSCRIPT_DIGITS[sortEntry.priority] ?? '')
+                : '';
+            const priLabel = sortEntry
+                ? ` (priority ${sortEntry.priority + 1})`
+                : '';
+
+            const clearSortTitle = sortEntry
+                ? `Remove ${col.label} from sort${priLabel}`
+                : `${col.label} is not currently sorted`;
+            const clearSortBtn = this._makeSortIcon('⇅', clearSortTitle, (_e) => {
+                this._sort.removeSort(col.key);
                 this._rerender();
             });
+
+            const ascActive = sortEntry?.direction === 'asc';
+            const ascTitle = ascActive
+                ? `${col.label}: sorting ascending${priLabel} — click to re-sort; Shift+click to add to multi-sort`
+                : `Sort ${col.label} ascending (Shift+click to add to multi-sort)`;
+            const ascBtn = this._makeSortIcon(
+                '▲' + (ascActive ? priSuffix : ''),
+                ascTitle,
+                (e) => {
+                    if (!e.shiftKey) this._sort.clearSort();
+                    this._sort.pushSort(col.key, 'asc');
+                    this._rerender();
+                }
+            );
+            if (ascActive) ascBtn.classList.add('st-sort-icon-active');
+
+            const descActive = sortEntry?.direction === 'desc';
+            const descTitle = descActive
+                ? `${col.label}: sorting descending${priLabel} — click to re-sort; Shift+click to add to multi-sort`
+                : `Sort ${col.label} descending (Shift+click to add to multi-sort)`;
+            const descBtn = this._makeSortIcon(
+                '▼' + (descActive ? priSuffix : ''),
+                descTitle,
+                (e) => {
+                    if (!e.shiftKey) this._sort.clearSort();
+                    this._sort.pushSort(col.key, 'desc');
+                    this._rerender();
+                }
+            );
+            if (descActive) descBtn.classList.add('st-sort-icon-active');
+
+            // Wrap the three icons in a tight group (no gap between ⇅ ▲ ▼)
+            const sortGroup = document.createElement('span');
+            sortGroup.className = 'st-sort-icons';
+            sortGroup.appendChild(clearSortBtn);
+            sortGroup.appendChild(ascBtn);
+            sortGroup.appendChild(descBtn);
+            left.appendChild(sortGroup);
         }
 
-        // Collapse badge: "▲ N / T" or "▼ N / T"
+        inner.appendChild(left);
+
+        // ---- CENTRE zone: column-level collapse toggle ----
         if (col.collapsible) {
+            const centre = document.createElement('div');
+            centre.className = 'st-th-centre';
+
             const collapseLabel = this._collapse.getHeaderLabel(col.key);
             if (collapseLabel) {
-                const badge = document.createElement('button');
-                badge.type = 'button';
-                badge.className = C.TH_COLLAPSE;
-                badge.setAttribute('aria-label',
+                const collapseState = this._collapse.getState(col.key);
+                const collapseBtn = document.createElement('button');
+                collapseBtn.type = 'button';
+                collapseBtn.className = C.TH_COLLAPSE;
+                const isColCollapsed = collapseState?.columnCollapsed;
+                collapseBtn.title = isColCollapsed
+                    ? `Expand all multi-row cells in ${col.label}`
+                    : `Collapse all multi-row cells in ${col.label} to peek rows only`;
+                collapseBtn.setAttribute('aria-label',
                     `Toggle collapse for column ${col.label}`);
-                badge.textContent = collapseLabel;
-                badge.addEventListener('click', (e) => {
+                collapseBtn.textContent = collapseLabel;
+                collapseBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this._collapse.toggleColumn(col.key);
                     this._rerender();
                 });
-                th.appendChild(badge);
+                centre.appendChild(collapseBtn);
             }
+
+            inner.appendChild(centre);
         }
 
-        // Filter button
+        // ---- RIGHT zone: unique-values badge ----
         if (col.filterable !== false) {
-            const cf = this._getColumnFilter(col.key);
-            const hasFilter = cf.metaEntries.length > 0
-                || cf.valueEntries.length > 0
-                || cf.regex.trim() !== '';
+            const right = document.createElement('div');
+            right.className = 'st-th-right';
 
-            const filterBtn = document.createElement('button');
-            filterBtn.type = 'button';
-            filterBtn.className = C.TH_FILTER_BTN;
-            filterBtn.setAttribute('aria-label', `Filter column ${col.label}`);
-            filterBtn.textContent = hasFilter ? '⧩' : '⧨';
-            if (hasFilter) {
-                th.classList.add(C.FILTER_ACTIVE);
-            }
-            filterBtn.addEventListener('click', (e) => {
+            const uniqueCount = this._uniqueCounts.get(col.key) ?? 0;
+            const badge = document.createElement('button');
+            badge.type = 'button';
+            badge.className = 'st-uniq-badge';
+            badge.title = `Open value-filter dropdown for ${col.label} (${uniqueCount} unique value${uniqueCount === 1 ? '' : 's'})`;
+            badge.setAttribute('aria-label',
+                `Filter column ${col.label} — ${uniqueCount} unique values`);
+            badge.textContent = `${uniqueCount}📊`;
+            badge.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this._toggleDropdown(col, th);
+                this._toggleDropdown(col, e);
             });
-            th.appendChild(filterBtn);
+
+            right.appendChild(badge);
+            inner.appendChild(right);
         }
 
+        th.appendChild(inner);
         this._resize.attachDragHandlers(th, col.key);
         return th;
     }
@@ -510,14 +833,16 @@ export class TableRenderer {
 
     /**
      * Builds the <tbody> for the current display indices.
+     * Uses a DocumentFragment for a single DOM append operation.
+     * Calls _applyColumnShading() after all TRs are built.
      *
      * @returns {HTMLTableSectionElement}
      */
     _buildTbody() {
-        // Pre-compute highlight patterns once so _makeSubrow can mark matches
+        // Pre-compute highlight patterns once
         this._globalPattern = buildHighlightPattern(
             this._filterState.globalRegex,
-            true,
+            this._filterState.globalIsRegex ?? false,
             this._filterState.globalRegexCase
         );
         this._colPatterns = new Map();
@@ -530,7 +855,7 @@ export class TableRenderer {
             }
         }
 
-        // Apply filter then sort
+        // Filter then sort
         const filtered = this._filter.filter(
             this._rows,
             this._allIdxs,
@@ -538,100 +863,141 @@ export class TableRenderer {
         );
         this._displayIdxs = this._sort.sort(filtered, this._rows);
 
-        // Value-group shading: alternate st-shade-a / st-shade-b each time the
-        // primary sort column's value changes between consecutive rows.
-        const primarySortKey = this._sort.getStack()[0]?.colKey ?? null;
-        let shadeGroup = 0;
-        const _SHADE_SENTINEL = Symbol('shade-sentinel');
-        let prevShadeValue = _SHADE_SENTINEL;
-
         const tbody = document.createElement('tbody');
         tbody.className = C.TBODY;
+        const frag = document.createDocumentFragment();
 
-        this._displayIdxs.forEach((origIdx, displayPos) => {
+        // Build all rows into a fragment, collecting TD references for shading
+        const rowData = this._displayIdxs.map((origIdx) => {
             const row = this._rows[origIdx];
             const tr  = document.createElement('tr');
             tr.className = C.TR;
             tr.dataset.origIdx = String(origIdx);
 
-            if (primarySortKey && this._options.shadingEnabled !== false) {
-                const groupValue = String(row[primarySortKey] ?? '');
-                if (prevShadeValue !== _SHADE_SENTINEL && groupValue !== prevShadeValue) {
-                    shadeGroup = 1 - shadeGroup;
-                }
-                prevShadeValue = groupValue;
-                tr.classList.add(shadeGroup === 0 ? C.SHADE_A : C.SHADE_B);
-            }
+            const tds = this._columns.map(col => {
+                const td = this._buildTd(col, row, origIdx);
+                tr.appendChild(td);
+                return td;
+            });
 
-            for (const col of this._columns) {
-                tr.appendChild(
-                    this._buildTd(col, row, origIdx, displayPos)
-                );
-            }
-
-            tbody.appendChild(tr);
+            frag.appendChild(tr);
+            return { row, tds };
         });
 
+        // Apply per-column per-priority TD shading
+        if (this._options.shadingEnabled !== false) {
+            this._applyColumnShading(rowData);
+        }
+
+        tbody.appendChild(frag);
         return tbody;
     }
 
     /**
-     * Builds a single <td> element, including sub-row rendering and
-     * collapse toggle glyph for collapsible columns.
+     * Applies per-column per-priority TD tint classes (st-mscol-{P}a/b).
+     * For each sorted column (in stack priority order), walks the TD column
+     * and alternates shade on value changes.
+     *
+     * @param {Array<{row: NormalizedRow, tds: HTMLTableCellElement[]}>} rowData
+     * @returns {void}
+     */
+    _applyColumnShading(rowData) {
+        const stack = this._sort.getStack();
+        if (!stack.length || !rowData.length) return;
+
+        const colIdxMap = new Map(this._columns.map((c, i) => [c.key, i]));
+
+        stack.forEach((entry, priorityIdx) => {
+            const colIdx = colIdxMap.get(entry.colKey);
+            if (colIdx === undefined) return;
+
+            const [classA, classB] = SHADE_PAIRS[priorityIdx % SHADE_PAIRS.length];
+            let shadeGroup = 0;
+            const SENTINEL = {};
+            let prevValue = /** @type {any} */ (SENTINEL);
+
+            for (const { row, tds } of rowData) {
+                const td = tds[colIdx];
+                if (!td) continue;
+                const rawVal = row[entry.colKey];
+                const value  = Array.isArray(rawVal)
+                    ? String(rawVal[0] ?? '')
+                    : String(rawVal ?? '');
+                if (prevValue !== SENTINEL && value !== prevValue) {
+                    shadeGroup = 1 - shadeGroup;
+                }
+                prevValue = value;
+                td.classList.add(shadeGroup === 0 ? classA : classB);
+            }
+        });
+    }
+
+    /**
+     * Builds a single <td> element.
+     * For collapsible multi-row cells, the collapse toggle is placed last
+     * (in a flex row pushed to the right) rather than first, and uses
+     * data attributes for event delegation instead of a per-button listener.
      *
      * @param {ColumnDef}    col
      * @param {NormalizedRow} row
      * @param {number}       origIdx    - Stable original row index.
-     * @param {number}       displayPos - Current display position (0-based).
      * @returns {HTMLTableCellElement}
      */
-    _buildTd(col, row, origIdx, displayPos) {
+    _buildTd(col, row, origIdx) {
         const td = document.createElement('td');
         td.className = C.TD;
 
         // Inspect cell for FilterEngine meta cache
         const rawEl = document.createElement('div');
-        rawEl.innerHTML = this._cellHTML(row, col.key);
+        rawEl.textContent = this._subRows(row, col.key).join(' ');
         const meta = inspectCell(rawEl);
         this._filter.setCellMeta(col.key, origIdx, meta);
 
-        // Build cell inner content
         const inner = document.createElement('div');
         inner.className = C.TD_INNER;
 
         const subRows = this._subRows(row, col.key);
 
         if (!col.collapsible || subRows.length <= (col.peekRows ?? 1)) {
-            // Single-row or non-collapsible: render all sub-rows, no toggle
             for (const text of subRows) {
                 inner.appendChild(this._makeSubrow(text, false, col, row));
             }
         } else {
-            // Multi-row collapsible cell
             const collapsed = this._collapse.isCellCollapsed(col.key, origIdx);
             const peekRows  = col.peekRows ?? 1;
             const glyph     = this._collapse.getCellGlyph(
                 col.key, origIdx, subRows.length
             );
 
-            // Toggle glyph button (before the peek row)
-            if (glyph) {
-                const toggleBtn = document.createElement('button');
-                toggleBtn.type = 'button';
-                toggleBtn.className = C.CELL_TOGGLE;
-                toggleBtn.setAttribute('aria-label',
-                    collapsed ? 'Expand cell' : 'Collapse cell');
-                toggleBtn.textContent = glyph;
-                toggleBtn.addEventListener('click', () => {
-                    this._collapse.toggleCell(col.key, origIdx);
-                    this._rerender();
-                });
-                inner.appendChild(toggleBtn);
-            }
+            // Build the toggle button once (used inline with first sub-row)
+            /** @type {HTMLButtonElement|null} */
+            const toggleBtn = glyph ? (() => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = C.CELL_TOGGLE;
+                btn.setAttribute('aria-label', collapsed ? 'Expand cell' : 'Collapse cell');
+                btn.textContent = glyph;
+                btn.dataset.colkey  = col.key;
+                btn.dataset.origidx = String(origIdx);
+                return btn;
+            })() : null;
 
+            // Sub-rows: first row gets the toggle button inline at its right edge
             subRows.forEach((text, i) => {
                 const hidden = collapsed && i >= peekRows;
-                inner.appendChild(this._makeSubrow(text, hidden, col, row));
+                const subDiv = this._makeSubrow(text, hidden, col, row);
+
+                if (i === 0 && toggleBtn) {
+                    // Wrap first sub-row + toggle in a flex row so the toggle
+                    // sits at the end of the first line of content
+                    const firstRow = document.createElement('div');
+                    firstRow.className = 'st-cell-first-row';
+                    firstRow.appendChild(subDiv);
+                    firstRow.appendChild(toggleBtn);
+                    inner.appendChild(firstRow);
+                } else {
+                    inner.appendChild(subDiv);
+                }
             });
         }
 
@@ -644,7 +1010,7 @@ export class TableRenderer {
     // -------------------------------------------------------------------------
 
     /**
-     * Replaces the tbody with a freshly built one, preserving the thead.
+     * Replaces thead and tbody with freshly built ones.
      * Called after every state change.
      *
      * @returns {void}
@@ -661,8 +1027,7 @@ export class TableRenderer {
         this._tableEl.replaceChild(newTbody, this._tbodyEl);
         this._tbodyEl = newTbody;
 
-        // Re-attach so the colgroup is rebuilt before the new thead; stored widths
-        // are re-applied to the fresh <col> elements by attach() → _applyWidths().
+        // Re-attach so colgroup is rebuilt; stored widths are re-applied.
         this._resize.attach(this._tableEl);
     }
 
@@ -671,13 +1036,16 @@ export class TableRenderer {
     // -------------------------------------------------------------------------
 
     /**
-     * Opens the dropdown for a column (or closes it if already open for that column).
+     * Opens the filter dropdown for a column (or closes it if already open).
+     * Positioned using document-absolute coordinates (getBoundingClientRect +
+     * window.scrollY/X) so it works correctly even on pages that use CSS
+     * `transform` on ancestors (which would break `position: fixed`).
      *
-     * @param {ColumnDef}    col
-     * @param {HTMLElement}  thEl - The header cell element (used for positioning).
+     * @param {ColumnDef} col
+     * @param {MouseEvent} event - The click event from the 📊 badge button.
      * @returns {void}
      */
-    _toggleDropdown(col, thEl) {
+    _toggleDropdown(col, event) {
         if (this._openDropdown) {
             this._openDropdown.destroy();
             this._openDropdown = null;
@@ -687,7 +1055,7 @@ export class TableRenderer {
             }
         }
 
-        const cf          = this._getColumnFilter(col.key);
+        const cf           = this._getColumnFilter(col.key);
         const uniqueValues = this._filter.buildUniqueValues(this._rows, col.key);
         const metaEntryKeys = this._filter.buildMetaEntries(
             this._rows, col.key, this._allIdxs
@@ -703,34 +1071,34 @@ export class TableRenderer {
             }
         );
 
-        const container = this._wrapper ?? document.body;
-        dropdown.build(container);
+        // Get the viewport rect of the badge button (event.currentTarget) —
+        // more precise than the full <th> and always the element actually clicked.
+        // Convert to document-absolute coordinates by adding window scroll offsets.
+        // Using position:absolute (not fixed) avoids breakage on pages that apply
+        // CSS transform to <body> or ancestor containers.
+        const anchor = /** @type {HTMLElement} */ (event.currentTarget ?? event.target);
+        const rect   = anchor.getBoundingClientRect();
+        const scrollX = window.pageXOffset ?? window.scrollX ?? 0;
+        const scrollY = window.pageYOffset ?? window.scrollY ?? 0;
 
-        // Position below the header cell
-        const rect = thEl.getBoundingClientRect();
-        const wrapRect = container.getBoundingClientRect();
-        const dropEl = container.querySelector('.st-dropdown');
-        if (dropEl instanceof HTMLElement) {
-            dropEl.style.position = 'absolute';
-            dropEl.style.top  = `${rect.bottom - wrapRect.top}px`;
-            dropEl.style.left = `${rect.left   - wrapRect.left}px`;
-        }
+        const dropEl = dropdown.build(document.body);
+        dropEl.style.position = 'absolute';
+        dropEl.style.top      = `${rect.bottom + scrollY + 2}px`;
+        dropEl.style.left     = `${rect.left   + scrollX}px`;
+        dropEl.style.zIndex   = '99999';
 
-        this._openDropdown    = dropdown;
+        this._openDropdown       = dropdown;
         this._openDropdownColKey = col.key;
 
-        // Close when clicking outside
         const closeHandler = (e) => {
-            if (!container.querySelector('.st-dropdown')?.contains(e.target)) {
+            if (!dropEl.contains(e.target)) {
                 dropdown.destroy();
-                this._openDropdown = null;
+                this._openDropdown       = null;
                 this._openDropdownColKey = null;
                 document.removeEventListener('click', closeHandler);
             }
         };
-        setTimeout(() =>
-            document.addEventListener('click', closeHandler), 0
-        );
+        setTimeout(() => document.addEventListener('click', closeHandler), 0);
     }
 
     // -------------------------------------------------------------------------
@@ -765,9 +1133,6 @@ export class TableRenderer {
 
     /**
      * Returns a new row with derived column values pre-computed.
-     * For each ColumnDef that has both `derivedFrom` and `derive` set, the
-     * source column's first string value is passed through `derive` and stored
-     * under this column's key. Array-valued source cells use their first element.
      *
      * @param {NormalizedRow} row
      * @returns {NormalizedRow}
@@ -804,20 +1169,74 @@ export class TableRenderer {
     }
 
     /**
-     * Returns raw HTML string for a cell (single-value or joined sub-rows).
-     * Used to seed the inspectCell DOM walker.
+     * Returns true if any collapsible column is currently collapsed.
+     * Used by the Expand/Collapse ALL button to determine its action.
      *
-     * @param {NormalizedRow} row
-     * @param {string}        colKey
-     * @returns {string}
+     * @returns {boolean}
      */
-    _cellHTML(row, colKey) {
-        return this._subRows(row, colKey).join(' ');
+    _anyCollapsed() {
+        return this._columns.some(col => {
+            if (!col.collapsible) return false;
+            const state = this._collapse.getState(col.key);
+            return state ? state.columnCollapsed : false;
+        });
     }
 
     /**
-     * Creates a sub-row element, optionally using ColumnDef.render for custom output.
-     * Sort and filter always operate on the raw `text` value — render is display-only.
+     * Creates a sort icon <button> (⇅, ▲, or ▼).
+     * The event is forwarded to the callback so callers can inspect modifiers
+     * (e.g. Shift+click to add to multi-sort rather than replacing it).
+     *
+     * @param {string}                    glyph
+     * @param {string}                    title
+     * @param {function(MouseEvent): void} onClick
+     * @returns {HTMLButtonElement}
+     */
+    _makeSortIcon(glyph, title, onClick) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'st-sort-icon';
+        btn.title = title;
+        btn.setAttribute('aria-label', title);
+        btn.textContent = glyph;
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            onClick(e);
+        });
+        return btn;
+    }
+
+    /**
+     * Creates a labelled checkbox widget (label element + checkbox input).
+     * Returns both so callers can store the checkbox reference for reset.
+     *
+     * @param {string}               label
+     * @param {string}               title
+     * @param {boolean}              initial
+     * @param {function(boolean): void} onChange
+     * @returns {{ element: HTMLLabelElement, checkbox: HTMLInputElement }}
+     */
+    _makeCheckbox(label, title, initial, onChange) {
+        const lab = document.createElement('label');
+        lab.className = 'st-filter-checkbox';
+        lab.title = title;
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = initial;
+        cb.addEventListener('change', () => onChange(cb.checked));
+
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(' ' + label));
+
+        return { element: lab, checkbox: cb };
+    }
+
+    /**
+     * Creates a sub-row element. Uses col.render when defined (display-only;
+     * sort and filter operate on raw values). Otherwise highlights filter
+     * matches with two distinct colors: st-highlight (global) and
+     * st-col-highlight (column).
      *
      * @param {string}          text
      * @param {boolean}         hidden
@@ -839,13 +1258,11 @@ export class TableRenderer {
                 div.textContent = String(result ?? text);
             }
         } else {
-            const patterns = [
-                this._colPatterns?.get(col?.key),
-                this._globalPattern,
-            ].filter(Boolean);
+            const globalPat = this._globalPattern ?? null;
+            const colPat    = col ? (this._colPatterns?.get(col.key) ?? null) : null;
 
-            if (patterns.length > 0) {
-                this._applyHighlight(div, text, /** @type {RegExp[]} */ (patterns));
+            if (globalPat || colPat) {
+                this._applyHighlight(div, text, globalPat, colPat);
             } else {
                 div.textContent = text;
             }
@@ -855,87 +1272,64 @@ export class TableRenderer {
     }
 
     /**
-     * Appends text content to div, wrapping matched substrings in
-     * <mark class="st-highlight">. Handles multiple overlapping patterns.
+     * Appends text content to div, wrapping matched substrings in <mark>
+     * elements with two priority levels:
+     *   2 → st-highlight (global match, yellow)
+     *   1 → st-col-highlight (column match, light blue)
+     * Global matches take priority over column matches in overlapping regions.
+     * Uses a character-level Uint8Array for correct overlap handling.
      *
-     * @param {HTMLElement} div
-     * @param {string}      text
-     * @param {RegExp[]}    patterns - All active highlight regexes (/g flag required).
+     * @param {HTMLElement}  div
+     * @param {string}       text
+     * @param {RegExp|null}  globalPattern - /g flag required; may be null.
+     * @param {RegExp|null}  colPattern    - /g flag required; may be null.
      * @returns {void}
      */
-    _applyHighlight(div, text, patterns) {
-        // Collect all [start, end) match ranges across all patterns
-        /** @type {number[][]} */
-        const ranges = [];
-        for (const re of patterns) {
+    _applyHighlight(div, text, globalPattern, colPattern) {
+        if (!text.length) {
+            div.textContent = '';
+            return;
+        }
+
+        const n = text.length;
+        const marks = new Uint8Array(n);
+        let anyMark = false;
+
+        const scan = (re, val) => {
+            if (!re) return;
             re.lastIndex = 0;
             let m;
             while ((m = re.exec(text)) !== null) {
-                if (m[0].length === 0) {
-                    re.lastIndex++;
-                    continue;
+                if (m[0].length === 0) { re.lastIndex++; continue; }
+                for (let k = m.index; k < m.index + m[0].length; k++) {
+                    if (marks[k] < val) { marks[k] = val; anyMark = true; }
                 }
-                ranges.push([m.index, m.index + m[0].length]);
             }
-        }
+        };
 
-        if (ranges.length === 0) {
+        scan(colPattern, 1);
+        scan(globalPattern, 2);
+
+        if (!anyMark) {
             div.textContent = text;
             return;
         }
 
-        // Sort and merge overlapping ranges
-        ranges.sort((a, b) => a[0] - b[0]);
-        const merged = [ranges[0].slice()];
-        for (let i = 1; i < ranges.length; i++) {
-            const last = merged[merged.length - 1];
-            if (ranges[i][0] <= last[1]) {
-                last[1] = Math.max(last[1], ranges[i][1]);
+        let i = 0;
+        while (i < n) {
+            const v = marks[i];
+            let j = i + 1;
+            while (j < n && marks[j] === v) j++;
+            const chunk = text.slice(i, j);
+            if (v === 0) {
+                div.appendChild(document.createTextNode(chunk));
             } else {
-                merged.push(ranges[i].slice());
+                const el = document.createElement('mark');
+                el.className = v === 2 ? 'st-highlight' : 'st-col-highlight';
+                el.textContent = chunk;
+                div.appendChild(el);
             }
+            i = j;
         }
-
-        // Build DOM: plain TextNodes interleaved with <mark> elements
-        let pos = 0;
-        for (const [start, end] of merged) {
-            if (pos < start) {
-                div.appendChild(document.createTextNode(text.slice(pos, start)));
-            }
-            const mark = document.createElement('mark');
-            mark.className = 'st-highlight';
-            mark.textContent = text.slice(start, end);
-            div.appendChild(mark);
-            pos = end;
-        }
-        if (pos < text.length) {
-            div.appendChild(document.createTextNode(text.slice(pos)));
-        }
-    }
-
-    /**
-     * Creates a labelled toggle button.
-     *
-     * @param {string}               label
-     * @param {boolean}              initial
-     * @param {function(boolean): void} onChange
-     * @returns {HTMLElement}
-     */
-    _makeToggle(label, initial, onChange) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'st-toggle';
-        btn.textContent = label;
-        btn.setAttribute('aria-pressed', String(initial));
-        btn.dataset.active = String(initial);
-
-        btn.addEventListener('click', () => {
-            const next = btn.dataset.active !== 'true';
-            btn.dataset.active = String(next);
-            btn.setAttribute('aria-pressed', String(next));
-            onChange(next);
-        });
-
-        return btn;
     }
 }

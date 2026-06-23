@@ -4,7 +4,7 @@
  *   Tracks per-column master state and per-cell overrides.
  *   Column header toggle always wins: it clears all cell overrides.
  *   Cell toggles only write to the overrides map.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 // ---------------------------------------------------------------------------
@@ -13,6 +13,9 @@
 // 1.0.0 — initial release
 //         CollapseEngine class defined with initColumn(), toggleColumn(),
 //         toggleCell(), isCellCollapsed(), getHeaderLabel() methods.
+// 1.1.0 — getHeaderLabel() now returns ▶/N/▤ (collapsed) or ◀/N/▤ (expanded),
+//          N = collapsibleCount (not totalRows). getCellGlyph() now returns
+//          ▶/N/▤ or ◀/N/▤ where N = subRowCount (total rows in that cell).
 // ---------------------------------------------------------------------------
 
 /**
@@ -145,8 +148,8 @@ export class CollapseEngine {
     }
 
     /**
-     * Builds the header badge text: "▲ N / T" or "▼ N / T"
-     * where N = collapsibleCount and T = totalRows.
+     * Builds the header toggle text: "▶/N/▤" (collapsed) or "◀/N/▤" (expanded)
+     * where N = collapsibleCount (cells with more sub-rows than peekRows).
      *
      * @param {string} colKey
      * @returns {string|null} Null if column is not collapsible.
@@ -156,13 +159,13 @@ export class CollapseEngine {
         if (!state) {
             return null;
         }
-        const arrow = state.columnCollapsed ? '▲' : '▼';
-        return `${arrow} ${state.collapsibleCount} / ${state.totalRows}`;
+        const arrow = state.columnCollapsed ? '▶' : '◀';
+        return `${arrow}/${state.collapsibleCount}/▤`;
     }
 
     /**
      * Builds the cell glyph text for a multi-row cell.
-     * Returns null for single-row cells (no glyph needed).
+     * Returns null for cells with peekRows or fewer sub-rows (no glyph needed).
      *
      * @param {string} colKey
      * @param {number} rowIdx
@@ -175,14 +178,13 @@ export class CollapseEngine {
             return null;
         }
         const peekRows = def.peekRows ?? 1;
-        const hiddenCount = subRowCount - peekRows;
-        if (hiddenCount <= 0) {
+        if (subRowCount <= peekRows) {
             return null;
         }
         const collapsed = this.isCellCollapsed(colKey, rowIdx);
         return collapsed
-            ? `▲ +${hiddenCount}`
-            : `▼ -${hiddenCount}`;
+            ? `▶/${subRowCount}/▤`
+            : `◀/${subRowCount}/▤`;
     }
 
     // -------------------------------------------------------------------------

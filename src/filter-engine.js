@@ -8,7 +8,7 @@
  *   Value selections within a column are OR-combined.
  *   Meta + value + regex filters across columns are AND-combined.
  *   Global regex is AND-combined with all column results.
- * @version 1.1.0
+ * @version 1.2.0
  */
 
 // ---------------------------------------------------------------------------
@@ -21,6 +21,9 @@
 //          it matches literally (no special regex characters). Added exported
 //          helpers escapeRegex() and buildHighlightPattern() used by the renderer
 //          to mark filter matches in cell text.
+// 1.2.0 — Stage 4 respects FilterState.globalIsRegex (default false = literal).
+//          Added _lastKey/_lastResult cache: filter() returns cached result when
+//          serialised state is unchanged between consecutive calls.
 // ---------------------------------------------------------------------------
 
 /**
@@ -125,6 +128,12 @@ export class FilterEngine {
          * @type {Map<string, Map<number, CellMeta>>}
          */
         this._metaCache = new Map();
+
+        /** @type {string|null} */
+        this._lastKey = null;
+
+        /** @type {number[]|null} */
+        this._lastResult = null;
     }
 
     // -------------------------------------------------------------------------
@@ -171,12 +180,23 @@ export class FilterEngine {
      *   3. Column regex  (per-column, AND across columns)
      *   4. Global regex  (across all columns of each row)
      *
+     * Empty column filters (no regex, no meta, no value entries) are skipped
+     * without building a RegExp or walking rows.
+     *
+     * A _lastKey/_lastResult cache returns the previous result when the
+     * serialised filter state is unchanged between consecutive calls.
+     *
      * @param {NormalizedRow[]} rows     - Full unfiltered row set.
      * @param {number[]}        rowIdxs  - Stable original indices for each row.
      * @param {FilterState}     state    - Current filter state.
      * @returns {number[]} Indices (into rows[]) of rows that passed all stages.
      */
     filter(rows, rowIdxs, state) {
+        const cacheKey = JSON.stringify(state) + ':' + rowIdxs.length;
+        if (cacheKey === this._lastKey && this._lastResult !== null) {
+            return this._lastResult.slice();
+        }
+
         let passing = rowIdxs.slice();
 
         const colFilterMap = new Map(
@@ -243,7 +263,9 @@ export class FilterEngine {
 
         // Stage 4: global regex (tests all column texts for each row)
         if (state.globalRegex.trim() !== '') {
-            const re = this._buildRegex(state.globalRegex, state.globalRegexCase);
+            const isRegex = state.globalIsRegex ?? false;
+            const pat     = isRegex ? state.globalRegex : escapeRegex(state.globalRegex);
+            const re      = this._buildRegex(pat, state.globalRegexCase);
             if (re) {
                 passing = passing.filter(i => {
                     const row = rows[i];
@@ -255,6 +277,8 @@ export class FilterEngine {
             }
         }
 
+        this._lastKey    = cacheKey;
+        this._lastResult = passing.slice();
         return passing;
     }
 

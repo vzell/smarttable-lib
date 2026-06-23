@@ -6,8 +6,8 @@
  *   script via Tampermonkey @require (idempotent — second load is a no-op).
  *
  *   All selectors use the "st-" namespace prefix so they never clash with
- *   the host page. No !important is used except on value-group shading
- *   (.st-shade-a / .st-shade-b) which must override nth-child zebra colours.
+ *   the host page. !important is used only on column-tint shading rules
+ *   (st-mscol-*) which must override the base row background.
  *
  *   Usage in a userscript (bundled):
  *     import { STYLES } from './styles.js';
@@ -15,7 +15,7 @@
  *
  *   Usage via @require (auto-injection, no extra code needed):
  *     // @require .../src/styles.js
- * @version 1.3.0
+ * @version 1.6.0
  */
 
 // ---------------------------------------------------------------------------
@@ -27,9 +27,36 @@
 //         tbody/tr/td, sub-rows, cell-toggle, shading, dropdown.
 // 1.2.0 — filter row styles (st-filter-row, st-filter-th, st-filter-input,
 //          st-filter-regex-btn) and match highlight (mark.st-highlight).
-// 1.3.0 — value-group shading replaces position-change flash shading
-//          st-shading-changed removed; st-shade-a / st-shade-b added.
-//          Applied to <tr> by the renderer when a sort is active.
+// 1.3.0 — value-group shading: st-shade-a / st-shade-b added (TR-level).
+// 1.4.0 — Complete visual overhaul for v1.2.0 feature set:
+//          st-shade-a / st-shade-b removed; replaced by per-column TD tinting
+//          (st-mscol-{P}a / st-mscol-{P}b) for 8 priority hues.
+//          st-mscol-hdr-{0-7}: header TH tints by sort priority.
+//          Three-zone header layout: st-th-inner / st-th-left / st-th-centre /
+//          st-th-right. st-sort-icon / st-sort-icon-active: sort widget.
+//          st-uniq-badge: {count}📊 badge replacing st-th-filter-btn (⧨/⧩).
+//          st-col-highlight: light blue column-filter match highlight.
+//          st-cell-toggle-row: flex row for per-cell toggle pushed right.
+//          st-filter-checkbox / st-filter-mods: Cc/Rx/Ex checkboxes.
+//          st-input-wrap / st-clear-btn: input wrapper + inset ✕ button.
+//          Action buttons: st-btn-expand-all, st-btn-toggle-hl,
+//          st-btn-clear-col-filters, st-btn-clear-all-filters.
+//          Removed: st-toggle, st-th-sort-badge, st-th-sort-dir,
+//          st-th-filter-btn, st-filter-regex-btn, st-shade-a, st-shade-b.
+//          st-wrapper.st-no-highlight: CSS hook hides all marks without rerender.
+// 1.5.0 — st-cell-toggle-row replaced by st-cell-first-row: the per-cell
+//          collapse toggle is now inline with the first sub-row (flex row with
+//          space-between) rather than a separate row below all content.
+//          st-sort-icons: inline-flex group wrapping ⇅▲▼ with gap: 0.
+// 1.6.0 — Bug fixes:
+//          (1) .st-filter-th .st-input-wrap gets min-width: 0, overriding the
+//              base 160px so the absolute-positioned ✕ button stays inside
+//              narrow columns instead of being clipped off-screen.
+//          (2) .st-th-inner changed from flex to CSS grid (1fr auto 1fr) so
+//              the centre-zone collapse toggle is always horizontally centred
+//              in the column header even when the left zone collapses.
+//          (3) .st-cell-first-row align-items changed from flex-start to center
+//              so the per-cell toggle is vertically centred in the first row.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -102,10 +129,18 @@ export const STYLES = /* css */`
     flex-wrap: wrap;
 }
 
-.st-global-input {
+/* Wrapper for input + inset ✕ button */
+.st-input-wrap {
+    position: relative;
     flex: 1 1 180px;
     min-width: 160px;
-    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+}
+
+.st-global-input {
+    width: 100%;
+    padding: 4px 26px 4px 8px;
     border: 1px solid #c8cad0;
     border-radius: 3px;
     font-size: inherit;
@@ -120,30 +155,44 @@ export const STYLES = /* css */`
     border-color: #3b82f6;
 }
 
-/* Toggle buttons (Exclude / Case) */
-.st-toggle {
-    padding: 3px 10px;
-    border: 1px solid #c8cad0;
-    border-radius: 3px;
-    font-size: inherit;
-    font-family: inherit;
+/* ✕ clear button inset inside the input */
+.st-clear-btn {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
     cursor: pointer;
-    background: #f5f5f7;
-    color: #555;
-    white-space: nowrap;
+    font-size: 12px;
+    color: #aaa;
+    line-height: 1;
+    padding: 2px 3px;
+    border-radius: 2px;
     user-select: none;
-    transition: background 0.1s, color 0.1s, border-color 0.1s;
 }
 
-.st-toggle:hover {
-    background: #eaeaec;
-    border-color: #aaa;
+.st-clear-btn:hover {
+    color: #555;
+    background: rgba(0, 0, 0, 0.06);
 }
 
-.st-toggle[data-active="true"] {
-    background: #2563eb;
-    border-color: #1d4ed8;
-    color: #fff;
+/* Checkbox modifier labels (Cc / Rx / Ex) */
+.st-filter-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    user-select: none;
+    white-space: nowrap;
+    color: #555;
+}
+
+.st-filter-checkbox input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+    accent-color: #2563eb;
 }
 
 /* Auto-size columns button */
@@ -163,6 +212,37 @@ export const STYLES = /* css */`
 .st-btn-auto-resize:hover {
     background: #eaeaec;
     border-color: #aaa;
+}
+
+/* Toolbar action buttons */
+.st-btn-expand-all,
+.st-btn-toggle-hl,
+.st-btn-clear-col-filters,
+.st-btn-clear-all-filters {
+    padding: 3px 10px;
+    border: 1px solid #c8cad0;
+    border-radius: 3px;
+    font-size: inherit;
+    font-family: inherit;
+    cursor: pointer;
+    background: #f5f5f7;
+    color: #555;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.st-btn-expand-all:hover,
+.st-btn-toggle-hl:hover,
+.st-btn-clear-col-filters:hover,
+.st-btn-clear-all-filters:hover {
+    background: #eaeaec;
+    border-color: #aaa;
+}
+
+.st-btn-clear-col-filters:hover,
+.st-btn-clear-all-filters:hover {
+    color: #b45309;
+    border-color: #d97706;
 }
 
 /* ============================================================
@@ -191,7 +271,7 @@ export const STYLES = /* css */`
 }
 
 .st-th {
-    padding: 6px 8px;
+    padding: 5px 6px;
     border: 1px solid #c8cad0;
     text-align: left;
     vertical-align: middle;
@@ -200,7 +280,6 @@ export const STYLES = /* css */`
     font-size: 12px;
     position: relative;
     user-select: none;
-    /* right-border acts as the drag-resize handle zone */
     cursor: default;
 }
 
@@ -219,51 +298,106 @@ export const STYLES = /* css */`
     background: #fde9a2;
 }
 
+/* ---- Three-zone flex layout (default — non-collapsible columns) ---- */
+/* Left zone gets all remaining space; right zone is fixed-width.
+   For collapsible columns, .st-th-inner--collapsible switches to a 3-column
+   CSS grid so the centre-zone toggle is truly horizontally centred even when
+   the left zone is clipped to near-zero by a very narrow column. */
+.st-th-inner {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 4px;
+}
+
+.st-th-left {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.st-th-centre {
+    flex: 0 0 auto;
+}
+
+.st-th-right {
+    flex: 0 0 auto;
+}
+
+/* Collapsible columns: CSS grid keeps the centre toggle truly centred */
+.st-th-inner--collapsible {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+}
+
+.st-th-inner--collapsible .st-th-left {
+    /* grid child — flex sizing via 1fr column */
+}
+
+.st-th-inner--collapsible .st-th-right {
+    justify-self: end;
+}
+
 /* ---- Column label ---- */
 .st-th-label {
-    margin-right: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 0 1 auto;
+    min-width: 0;
 }
 
-/* ---- Sort priority badge (number circle) ---- */
-.st-th-sort-badge {
+/* ---- Sort icon group (wraps ⇅ ▲ ▼ with no gap between them) ---- */
+.st-sort-icons {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    min-width: 15px;
-    height: 15px;
-    padding: 0 3px;
-    border-radius: 8px;
-    background: #2563eb;
-    color: #fff;
-    font-size: 9px;
-    font-weight: 700;
-    margin-right: 1px;
-    vertical-align: middle;
+    gap: 0;
+    flex-shrink: 0;
+}
+
+/* ---- Sort icon buttons (⇅ / ▲ / ▼) ---- */
+.st-sort-icon {
+    padding: 0 2px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 11px;
+    color: #777;
+    border-radius: 2px;
     line-height: 1;
+    flex-shrink: 0;
+    transition: color 0.1s, background 0.1s;
 }
 
-/* ---- Sort direction arrow ---- */
-.st-th-sort-dir {
-    font-size: 9px;
-    color: #2563eb;
-    margin-right: 4px;
-    vertical-align: middle;
+.st-sort-icon:hover {
+    color: #222;
+    background: rgba(0, 0, 0, 0.07);
 }
 
-/* ---- Column collapse badge (in header) ---- */
+/* Active sort direction button: green text + yellow background */
+.st-sort-icon-active {
+    color: #166534 !important;
+    background: #fef08a !important;
+}
+
+/* ---- Column collapse toggle (centre zone) ---- */
 .st-th-collapse {
     display: inline-block;
     padding: 1px 5px;
-    margin-left: 3px;
     border: 1px solid #b8bbc4;
     border-radius: 3px;
     background: #fff;
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1.5;
     cursor: pointer;
     vertical-align: middle;
     color: #555;
     user-select: none;
+    white-space: nowrap;
 }
 
 .st-th-collapse:hover {
@@ -271,31 +405,40 @@ export const STYLES = /* css */`
     border-color: #999;
 }
 
-/* ---- Per-column filter button ---- */
-.st-th-filter-btn {
-    display: inline-block;
-    padding: 1px 4px;
-    margin-left: 3px;
+/* ---- Unique-values badge / 📊 (right zone) ---- */
+.st-uniq-badge {
+    padding: 1px 5px;
     border: 1px solid transparent;
     border-radius: 3px;
     background: transparent;
-    font-size: 13px;
-    line-height: 1;
+    font-size: 11px;
+    line-height: 1.5;
     cursor: pointer;
-    vertical-align: middle;
-    color: #999;
+    color: #555;
     user-select: none;
+    white-space: nowrap;
+    transition: background 0.1s, border-color 0.1s;
 }
 
-.st-th-filter-btn:hover {
-    background: #dce0e8;
+.st-uniq-badge:hover {
+    background: #e0e4f0;
     border-color: #b8bbc4;
-    color: #444;
+    color: #222;
 }
 
-.st-th--filter-active .st-th-filter-btn {
+.st-th--filter-active .st-uniq-badge {
     color: #b45309;
 }
+
+/* ---- Header tints by sort priority (60 % alpha) ---- */
+.st-wrapper .st-mscol-hdr-0 { background-color: rgba(255, 200,  80, 0.60) !important; }
+.st-wrapper .st-mscol-hdr-1 { background-color: rgba( 80, 180, 255, 0.60) !important; }
+.st-wrapper .st-mscol-hdr-2 { background-color: rgba(120, 230, 120, 0.60) !important; }
+.st-wrapper .st-mscol-hdr-3 { background-color: rgba(230, 120, 230, 0.60) !important; }
+.st-wrapper .st-mscol-hdr-4 { background-color: rgba(255, 160, 100, 0.60) !important; }
+.st-wrapper .st-mscol-hdr-5 { background-color: rgba(100, 230, 210, 0.60) !important; }
+.st-wrapper .st-mscol-hdr-6 { background-color: rgba(180, 160, 255, 0.60) !important; }
+.st-wrapper .st-mscol-hdr-7 { background-color: rgba(255, 220, 180, 0.60) !important; }
 
 /* ============================================================
    Body rows
@@ -316,7 +459,26 @@ export const STYLES = /* css */`
     background: #fff;
 }
 
-/* Inner wrapper — column of sub-rows */
+/* Per-column per-priority TD tints — alternate a/b on value-group change.
+   !important overrides the nth-child zebra and hover rules above.         */
+.st-wrapper .st-mscol-0a { background-color: rgba(255, 200,  80, 0.22) !important; }
+.st-wrapper .st-mscol-0b { background-color: rgba(255, 200,  80, 0.44) !important; }
+.st-wrapper .st-mscol-1a { background-color: rgba( 80, 180, 255, 0.22) !important; }
+.st-wrapper .st-mscol-1b { background-color: rgba( 80, 180, 255, 0.44) !important; }
+.st-wrapper .st-mscol-2a { background-color: rgba(120, 230, 120, 0.22) !important; }
+.st-wrapper .st-mscol-2b { background-color: rgba(120, 230, 120, 0.44) !important; }
+.st-wrapper .st-mscol-3a { background-color: rgba(230, 120, 230, 0.22) !important; }
+.st-wrapper .st-mscol-3b { background-color: rgba(230, 120, 230, 0.44) !important; }
+.st-wrapper .st-mscol-4a { background-color: rgba(255, 160, 100, 0.22) !important; }
+.st-wrapper .st-mscol-4b { background-color: rgba(255, 160, 100, 0.44) !important; }
+.st-wrapper .st-mscol-5a { background-color: rgba(100, 230, 210, 0.22) !important; }
+.st-wrapper .st-mscol-5b { background-color: rgba(100, 230, 210, 0.44) !important; }
+.st-wrapper .st-mscol-6a { background-color: rgba(180, 160, 255, 0.22) !important; }
+.st-wrapper .st-mscol-6b { background-color: rgba(180, 160, 255, 0.44) !important; }
+.st-wrapper .st-mscol-7a { background-color: rgba(255, 220, 180, 0.22) !important; }
+.st-wrapper .st-mscol-7b { background-color: rgba(255, 220, 180, 0.44) !important; }
+
+/* Inner wrapper — column of sub-rows + bottom-right toggle row */
 .st-td-inner {
     display: flex;
     flex-direction: column;
@@ -334,11 +496,23 @@ export const STYLES = /* css */`
     display: none;
 }
 
+/* Flex row: first sub-row text + inline toggle button at the right edge */
+.st-cell-first-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    justify-content: space-between;
+}
+
+.st-cell-first-row .st-subrow {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 /* Per-cell expand/collapse toggle */
 .st-cell-toggle {
     display: inline-block;
     padding: 0 5px;
-    margin-bottom: 3px;
     border: 1px solid #c8cad0;
     border-radius: 3px;
     background: #f0f0f2;
@@ -347,23 +521,11 @@ export const STYLES = /* css */`
     cursor: pointer;
     color: #555;
     user-select: none;
-    align-self: flex-start;
 }
 
 .st-cell-toggle:hover {
     background: #dce0e8;
     border-color: #aaa;
-}
-
-/* Value-group shading — applied to <tr> when a sort is active.
-   Consecutive rows sharing the same primary-sort value get the same shade;
-   the group alternates on every value boundary.
-   !important is required to override the nth-child zebra rule below. */
-.st-tr.st-shade-b .st-td {
-    background-color: #dbeafe !important; /* light blue — alternating group */
-}
-.st-tr.st-shade-a .st-td {
-    background-color: #fff !important;    /* white — default group */
 }
 
 /* ============================================================
@@ -372,7 +534,7 @@ export const STYLES = /* css */`
 
 .st-dropdown {
     position: absolute;
-    z-index: 9999;             /* above sticky thead and host page chrome */
+    z-index: 9999;
     min-width: 220px;
     max-width: 360px;
     max-height: 380px;
@@ -406,7 +568,6 @@ export const STYLES = /* css */`
     border-top: 1px solid #ebebeb;
 }
 
-/* Quick-filter search box */
 .st-dropdown-quick-input {
     display: block;
     width: calc(100% - 20px);
@@ -426,7 +587,6 @@ export const STYLES = /* css */`
     border-color: #3b82f6;
 }
 
-/* Checkable item row */
 .st-dropdown-item {
     display: flex;
     align-items: baseline;
@@ -448,13 +608,11 @@ export const STYLES = /* css */`
     background: #dbeafe;
 }
 
-/* Meta entries (isEmpty, brokenSrc, etc.) rendered italic */
 .st-dropdown-item--meta {
     font-style: italic;
     color: #666;
 }
 
-/* ☐ / ☑ glyph */
 .st-dropdown-checkbox {
     flex-shrink: 0;
     font-size: 14px;
@@ -466,7 +624,6 @@ export const STYLES = /* css */`
     color: #2563eb;
 }
 
-/* Value label */
 .st-dropdown-item-label {
     flex: 1 1 auto;
     overflow: hidden;
@@ -474,7 +631,6 @@ export const STYLES = /* css */`
     white-space: nowrap;
 }
 
-/* Occurrence count pill */
 .st-dropdown-count {
     flex-shrink: 0;
     font-size: 10px;
@@ -487,7 +643,6 @@ export const STYLES = /* css */`
     line-height: 1.5;
 }
 
-/* "No matching values" message */
 .st-dropdown-no-results {
     padding: 8px 10px;
     color: #bbb;
@@ -506,9 +661,19 @@ export const STYLES = /* css */`
     font-weight: normal;
 }
 
+/* Within filter-th, override st-input-wrap to fill width.
+   min-width: 0 is required — the base .st-input-wrap has min-width: 160px which
+   would overflow narrow columns and push the absolute ✕ button out of view. */
+.st-filter-th .st-input-wrap {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    margin-bottom: 2px;
+}
+
 .st-filter-input {
-    width: calc(100% - 28px);
-    padding: 2px 5px;
+    width: 100%;
+    padding: 2px 22px 2px 5px;
     border: 1px solid #c8cad0;
     border-radius: 3px;
     font-size: 11px;
@@ -525,40 +690,40 @@ export const STYLES = /* css */`
     border-color: #3b82f6;
 }
 
-.st-filter-regex-btn {
-    padding: 1px 4px;
-    margin-left: 2px;
-    border: 1px solid #c8cad0;
-    border-radius: 3px;
-    background: #f5f5f7;
-    font-size: 10px;
-    font-family: monospace;
-    cursor: pointer;
-    color: #888;
-    vertical-align: middle;
-    user-select: none;
-}
-
-.st-filter-regex-btn:hover {
-    background: #eaeaec;
-    border-color: #aaa;
-}
-
-.st-filter-regex-btn[data-active="true"] {
-    background: #2563eb;
-    border-color: #1d4ed8;
-    color: #fff;
+/* Row of Cc / Rx / Ex checkboxes below the input */
+.st-filter-mods {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 2px;
 }
 
 /* ============================================================
-   Filter match highlight
+   Filter match highlights
    ============================================================ */
 
+/* Global filter match — yellow */
 .st-wrapper mark.st-highlight {
-    background-color: #fef08a;
+    background-color: #FFD700;
     color: inherit;
     border-radius: 2px;
     padding: 0 1px;
+}
+
+/* Column filter match — light blue */
+.st-wrapper mark.st-col-highlight {
+    background-color: #add8e6;
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
+/* "Toggle ALL highlighting" adds this class to .st-wrapper to suppress all marks */
+.st-wrapper.st-no-highlight mark.st-highlight,
+.st-wrapper.st-no-highlight mark.st-col-highlight {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
 }
 `;
 
