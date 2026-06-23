@@ -163,8 +163,7 @@ Sites to implement:
 `src/index.js` imports `styles.js` as a side-effect so styles are bundled
 and auto-inject on first load (idempotent).
 
-Still needed:
-- `.github/workflows/release.yml` to auto-build on tag push
+Release workflow: `.github/workflows/release.yml` — ✅ Done
 
 ---
 

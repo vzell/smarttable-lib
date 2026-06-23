@@ -1,0 +1,100 @@
+name: Release
+
+# Triggered by pushing a semver tag: v1.0.0, v1.2.3, etc.
+# The workflow:
+#   1. Rebuilds dist/smarttable.min.js from source
+#   2. Verifies the rebuild matches what was committed (enforces "build before tag")
+#   3. Verifies package.json version matches the tag
+#   4. Creates a GitHub Release and attaches the built file as a release asset
+#
+# jsDelivr CDN URL (after release):
+#   https://cdn.jsdelivr.net/gh/{owner}/smarttable-lib@{tag}/dist/smarttable.min.js
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write   # needed to create releases and upload assets
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Checkout
+      # -----------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 2. Node.js + npm cache
+      # -----------------------------------------------------------------------
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # -----------------------------------------------------------------------
+      # 3. Install (uses lockfile — deterministic)
+      # -----------------------------------------------------------------------
+      - name: Install dependencies
+        run: npm ci
+
+      # -----------------------------------------------------------------------
+      # 4. Rebuild
+      # esbuild is deterministic: same source + same lockfile → identical bytes.
+      # -----------------------------------------------------------------------
+      - name: Build
+        run: npm run build
+
+      # -----------------------------------------------------------------------
+      # 5. Guard: dist must match the committed file
+      # If it differs, the developer forgot to run "npm run build" before tagging.
+      # -----------------------------------------------------------------------
+      - name: Verify dist matches committed output
+        run: |
+          if ! git diff --quiet dist/smarttable.min.js; then
+            echo ""
+            echo "ERROR: dist/smarttable.min.js was rebuilt but differs from"
+            echo "the committed version at this tag."
+            echo ""
+            echo "Fix: run 'npm run build', commit dist/smarttable.min.js, then re-tag."
+            echo ""
+            git diff --stat dist/smarttable.min.js
+            exit 1
+          fi
+          echo "dist/smarttable.min.js matches source. OK."
+
+      # -----------------------------------------------------------------------
+      # 6. Guard: package.json version must match the tag
+      # -----------------------------------------------------------------------
+      - name: Verify package.json version matches tag
+        run: |
+          PKG_VERSION="v$(node -p "require('./package.json').version")"
+          TAG="${{ github.ref_name }}"
+          if [ "$PKG_VERSION" != "$TAG" ]; then
+            echo ""
+            echo "ERROR: package.json version ($PKG_VERSION) does not match tag ($TAG)."
+            echo ""
+            echo "Fix: update \"version\" in package.json to match the tag, then re-tag."
+            exit 1
+          fi
+          echo "package.json version matches tag ($TAG). OK."
+
+      # -----------------------------------------------------------------------
+      # 7. Create GitHub Release + upload dist as release asset
+      # --generate-notes pulls commit messages since the previous tag.
+      # -----------------------------------------------------------------------
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            "dist/smarttable.min.js"
