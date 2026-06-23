@@ -81,10 +81,10 @@ filter/sort/collapse re-renders.
 
 ---
 
-## TODO — CSS stylesheet
+## CSS stylesheet — ✅ Done
 
-No CSS has been written yet. A `GM_addStyle` block or a separate `src/styles.js`
-file needs to provide default styles for all CSS classes used by the renderer.
+`src/styles.js` — exports `STYLES` string constant and auto-injects a
+`<style id="st-styles">` element when loaded via `@require`.
 
 ### CSS classes inventory
 
