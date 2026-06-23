@@ -7,7 +7,7 @@
  *     1. inject() — create table skeleton + inject trigger button on the page
  *     2. render() — build thead/tbody from current data + filter/sort/collapse state
  *     3. re-render() — called after any state change (filter, sort, collapse toggle)
- * @version 1.2.0
+ * @version 1.3.0
  */
 
 // ---------------------------------------------------------------------------
@@ -26,6 +26,13 @@
 // 1.2.0 — derived column support
 //         _expandRow() pre-computes ColumnDef.derive(sourceValue) values into
 //         each row at construction time so sort/filter/collapse see them.
+// 1.3.0 — complete ResizeEngine wiring
+//         _buildWrapper(): attach ResizeEngine after table enters DOM; apply
+//           initial col.width values via setColWidth() (not th.style.width).
+//         _buildGlobalBar(): "Auto-size columns" button added.
+//         _buildTh(): attachDragHandlers() called per column; th.style.width
+//           removed (invariant: widths via <col> only, never on <th>/<td>).
+//         _rerender(): re-attach ResizeEngine so colgroup tracks new thead.
 // ---------------------------------------------------------------------------
 
 import { CollapseEngine }              from './collapse-engine.js';
@@ -197,6 +204,19 @@ export class TableRenderer {
 
         this._container.appendChild(wrapper);
         this._wrapper = wrapper;
+
+        // Attach after wrapper is in the DOM so the ruler inherits CSS context
+        this._resize.attach(this._tableEl);
+
+        // Seed any initial widths declared on column definitions
+        for (const col of this._columns) {
+            if (col.width) {
+                const px = parseFloat(col.width);
+                if (px > 0) {
+                    this._resize.setColWidth(col.key, px);
+                }
+            }
+        }
     }
 
     /**
@@ -229,9 +249,18 @@ export class TableRenderer {
             this._rerender();
         });
 
+        const autoSizeBtn = document.createElement('button');
+        autoSizeBtn.className = C.BTN_AUTO_RESIZE;
+        autoSizeBtn.textContent = 'Auto-size columns';
+        autoSizeBtn.addEventListener('click', () => {
+            const displayRows = this._displayIdxs.map(i => this._rows[i]);
+            this._resize.autoResize(this._rows, displayRows);
+        });
+
         bar.appendChild(input);
         bar.appendChild(excludeToggle);
         bar.appendChild(caseToggle);
+        bar.appendChild(autoSizeBtn);
         return bar;
     }
 
@@ -292,9 +321,6 @@ export class TableRenderer {
     _buildTh(col) {
         const th = document.createElement('th');
         th.className = C.TH;
-        if (col.width) {
-            th.style.width = col.width;
-        }
 
         // Label
         const label = document.createElement('span');
@@ -366,6 +392,7 @@ export class TableRenderer {
             th.appendChild(filterBtn);
         }
 
+        this._resize.attachDragHandlers(th, col.key);
         return th;
     }
 
@@ -507,6 +534,10 @@ export class TableRenderer {
         this._tableEl.replaceChild(newThead, this._tableEl.querySelector('thead'));
         this._tableEl.replaceChild(newTbody, this._tbodyEl);
         this._tbodyEl = newTbody;
+
+        // Re-attach so the colgroup is rebuilt before the new thead; stored widths
+        // are re-applied to the fresh <col> elements by attach() → _applyWidths().
+        this._resize.attach(this._tableEl);
     }
 
     // -------------------------------------------------------------------------

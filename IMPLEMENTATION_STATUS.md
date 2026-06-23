@@ -11,73 +11,8 @@
 | `src/sort-engine.js` | ✅ Done | Multi-column sort, shading snapshot |
 | `src/dropdown.js` | ✅ Done | Three-section dropdown, Dropdown class, `emptyColumnFilter()` |
 | `src/resize-engine.js` | ✅ Done | ResizeEngine, off-screen ruler, drag state machine |
-| `src/table-renderer.js` | ⚠️ Partial | ResizeEngine integration was in progress — see TODO below |
+| `src/table-renderer.js` | ✅ Done | ResizeEngine fully wired; derived column support |
 | `src/index.js` | ✅ Done | `SmartTable.render()` public API |
-
----
-
-## TODO — table-renderer.js integration of ResizeEngine
-
-The following changes to `src/table-renderer.js` were started but not fully
-applied when the session ended. These are the remaining integration tasks:
-
-### 1. Import already applied ✅
-```js
-import { ResizeEngine } from './resize-engine.js';
-```
-
-### 2. Constructor already updated ✅
-```js
-this._resize = new ResizeEngine(columns);
-```
-
-### 3. destroy() already updated ✅
-```js
-this._resize.detach();
-```
-
-### 4. BTN_AUTO_RESIZE constant already added ✅
-```js
-BTN_AUTO_RESIZE: 'st-btn-auto-resize',
-```
-
-### 5. TODO — attach ResizeEngine after table is built in _buildTable()
-After the `<table>` element is created and appended to the DOM,
-call:
-```js
-// After table is in the DOM (inside _buildWrapper, after appendChild):
-this._resize.attach(this._tableEl);
-```
-
-### 6. TODO — add "Auto-size columns" button to _buildGlobalBar()
-```js
-const autoSizeBtn = document.createElement('button');
-autoSizeBtn.className = C.BTN_AUTO_RESIZE;
-autoSizeBtn.textContent = 'Auto-size columns';
-autoSizeBtn.addEventListener('click', () => {
-    const displayRows = this._displayIdxs.map(i => this._rows[i]);
-    this._resize.autoResize(this._rows, displayRows);
-});
-bar.appendChild(autoSizeBtn);
-```
-
-### 7. TODO — attach drag handlers to each <th> in _buildTh()
-At the end of `_buildTh(col)`, before `return th`:
-```js
-this._resize.attachDragHandlers(th, col.key);
-```
-
-### 8. TODO — re-attach ResizeEngine colgroup after _rerender()
-After `_rerender()` replaces the `<thead>`, call `_ensureColgroup()` internally
-via a new public method on ResizeEngine, or just re-attach:
-```js
-// At end of _rerender():
-this._resize.attach(this._tableEl);
-```
-Note: `ResizeEngine.attach()` calls `_ensureColgroup()` which replaces the
-existing colgroup — this is safe and idempotent. Stored widths in
-`this._widths` are preserved across re-attaches, so column widths survive
-filter/sort/collapse re-renders.
 
 ---
 

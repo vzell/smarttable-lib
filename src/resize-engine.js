@@ -16,7 +16,7 @@
  *   Requires table-layout:fixed on the <table> element once any explicit
  *   width has been set; the engine sets this automatically.
  *
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 // ---------------------------------------------------------------------------
@@ -27,6 +27,9 @@
 //         getColWidth(), setColWidth(), applyWidths() defined.
 //         Off-screen ruler singleton created per engine instance.
 //         Drag state machine: IDLE / DRAG_READY / DRAGGING.
+// 1.0.1 — attach() now calls _applyWidths() after _ensureColgroup() so that
+//         stored widths survive table-renderer re-renders (which replace thead
+//         and tbody but keep the same table element and ResizeEngine instance).
 // ---------------------------------------------------------------------------
 
 /**
@@ -114,6 +117,7 @@ export class ResizeEngine {
         this._tableEl = tableEl;
         this._ensureColgroup();
         this._ensureRuler(tableEl);
+        this._applyWidths();
     }
 
     /**
