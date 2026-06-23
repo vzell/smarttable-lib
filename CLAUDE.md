@@ -26,6 +26,7 @@ Full design documentation is in the `docs/` folder:
 - `docs/FEATURES.md` — detailed feature specifications
 - `docs/DIAGRAMS.md` — Mermaid architecture and flow diagrams
 - `docs/IMPLEMENTATION_STATUS.md` — what is done, what is TODO
+- `docs/SITE_ADAPTERS.md` — site adapter reference
 
 ---
 
