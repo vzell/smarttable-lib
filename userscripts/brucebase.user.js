@@ -10,8 +10,8 @@
 // @author       vzell
 // @match        *://brucebase.wikidot.com/1*
 // @match        *://brucebase.wikidot.com/2*
-// @require      https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/smarttable-lib/main/dist/smarttable.min.js
-// @require      https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/smarttable-lib/main/adapters/brucebase.js
+// @require      https://raw.githubusercontent.com/vzell/smarttable-lib/main/dist/smarttable.min.js
+// @require      https://raw.githubusercontent.com/vzell/smarttable-lib/main/adapters/brucebase.js
 // @grant        none
 // ==/UserScript==
 

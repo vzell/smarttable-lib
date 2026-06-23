@@ -8,8 +8,8 @@
 //               The year is read from the "and[]" URL parameter; falls back to current year.
 // @author       vzell
 // @match        https://archive.org/search*
-// @require      https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/smarttable-lib/main/dist/smarttable.min.js
-// @require      https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/smarttable-lib/main/adapters/archive-org.js
+// @require      https://raw.githubusercontent.com/vzell/smarttable-lib/main/dist/smarttable.min.js
+// @require      https://raw.githubusercontent.com/vzell/smarttable-lib/main/adapters/archive-org.js
 // @grant        GM_xmlhttpRequest
 // @connect      archive.org
 // ==/UserScript==

@@ -6,8 +6,8 @@
 //               Works on both the unofficial (tipe=-1) and official (tipe=-2) views.
 // @author       vzell
 // @match        https://www.brucespringsteen.it/DB/records.aspx*
-// @require      https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/smarttable-lib/main/dist/smarttable.min.js
-// @require      https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/smarttable-lib/main/adapters/brucespringsteen-it.js
+// @require      https://raw.githubusercontent.com/vzell/smarttable-lib/main/dist/smarttable.min.js
+// @require      https://raw.githubusercontent.com/vzell/smarttable-lib/main/adapters/brucespringsteen-it.js
 // @grant        none
 // ==/UserScript==
 
