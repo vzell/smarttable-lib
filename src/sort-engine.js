@@ -4,7 +4,7 @@
  *   tracking for shading. Comparators are dispatched by ColumnDef.type.
  *   Shading state is maintained across renders so the renderer can diff
  *   old vs new positions and apply CSS transition classes.
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 // ---------------------------------------------------------------------------
@@ -13,6 +13,11 @@
 // 1.0.0 — initial release
 //         SortEngine class with sort(), pushSort(), removeSort(), clearSort(),
 //         getShadingClass() defined.
+// 1.0.1 — fix: shading never fired on the first sort click because _currValues
+//          was empty, making _prevValues empty after the snapshot copy, causing
+//          getShadingClass() to short-circuit (undefined check). Fix: seed
+//          _currValues from the pre-sort positions for any column not yet
+//          tracked before copying into _prevValues.
 // ---------------------------------------------------------------------------
 
 /**
@@ -156,6 +161,18 @@ export class SortEngine {
         if (this._stack.length === 0) {
             return rowIdxs.slice();
         }
+
+        // Seed _currValues for any sort-stack column not yet tracked
+        // (first sort, or first time a column is added to the stack) so the
+        // shading diff can fire on the very first click of a column header.
+        rowIdxs.forEach((origIdx, pos) => {
+            for (const entry of this._stack) {
+                const key = `${entry.colKey}:${pos}`;
+                if (!this._currValues.has(key)) {
+                    this._currValues.set(key, this._cellText(rows[origIdx], entry.colKey));
+                }
+            }
+        });
 
         // Snapshot current → becomes previous before we re-sort
         this._prevValues = new Map(this._currValues);
