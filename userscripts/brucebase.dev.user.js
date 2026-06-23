@@ -10,8 +10,8 @@
 // @author       vzell
 // @match        *://brucebase.wikidot.com/1*
 // @match        *://brucebase.wikidot.com/2*
-// @require      file:///home/vzell/git/springsteen-site-parser/dist/smarttable.js
-// @require      file:///home/vzell/git/springsteen-site-parser/adapters/brucebase.js
+// @require      file:///V:/home/vzell/git/springsteen-site-parser/dist/smarttable.js
+// @require      file:///V:/home/vzell/git/springsteen-site-parser/adapters/brucebase.js
 // @grant        none
 // ==/UserScript==
 

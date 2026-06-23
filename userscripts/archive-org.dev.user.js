@@ -8,8 +8,8 @@
 //               The year is read from the "and[]" URL parameter; falls back to current year.
 // @author       vzell
 // @match        https://archive.org/search*
-// @require      file:///home/vzell/git/springsteen-site-parser/dist/smarttable.js
-// @require      file:///home/vzell/git/springsteen-site-parser/adapters/archive-org.js
+// @require      file:///V:/home/vzell/git/springsteen-site-parser/dist/smarttable.js
+// @require      file:///V:/home/vzell/git/springsteen-site-parser/adapters/archive-org.js
 // @grant        GM_xmlhttpRequest
 // @connect      archive.org
 // ==/UserScript==

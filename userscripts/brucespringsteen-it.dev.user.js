@@ -6,8 +6,8 @@
 //               Works on both the unofficial (tipe=-1) and official (tipe=-2) views.
 // @author       vzell
 // @match        https://www.brucespringsteen.it/DB/records.aspx*
-// @require      file:///home/vzell/git/springsteen-site-parser/dist/smarttable.js
-// @require      file:///home/vzell/git/springsteen-site-parser/adapters/brucespringsteen-it.js
+// @require      file:///V:/home/vzell/git/springsteen-site-parser/dist/smarttable.js
+// @require      file:///V:/home/vzell/git/springsteen-site-parser/adapters/brucespringsteen-it.js
 // @grant        none
 // ==/UserScript==
 
