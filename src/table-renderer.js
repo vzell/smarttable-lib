@@ -7,7 +7,7 @@
  *     1. inject() — create table skeleton + inject trigger button on the page
  *     2. render() — build thead/tbody from current data + filter/sort/collapse state
  *     3. re-render() — called after any state change (filter, sort, collapse toggle)
- * @version 1.3.0
+ * @version 1.3.1
  */
 
 // ---------------------------------------------------------------------------
@@ -26,6 +26,8 @@
 // 1.2.0 — derived column support
 //         _expandRow() pre-computes ColumnDef.derive(sourceValue) values into
 //         each row at construction time so sort/filter/collapse see them.
+// 1.3.1 — set type="button" on every created <button> element so none of them
+//         accidentally submit a host-page <form> (HTML default is type="submit").
 // 1.3.0 — complete ResizeEngine wiring
 //         _buildWrapper(): attach ResizeEngine after table enters DOM; apply
 //           initial col.width values via setColWidth() (not th.style.width).
@@ -159,6 +161,7 @@ export class TableRenderer {
      */
     inject() {
         const btn = document.createElement('button');
+        btn.type = 'button'; // prevent form submission when injected inside a <form>
         btn.className = C.BTN_TRIGGER;
         btn.textContent = 'Show table';
         btn.addEventListener('click', () => {
@@ -250,6 +253,7 @@ export class TableRenderer {
         });
 
         const autoSizeBtn = document.createElement('button');
+        autoSizeBtn.type = 'button';
         autoSizeBtn.className = C.BTN_AUTO_RESIZE;
         autoSizeBtn.textContent = 'Auto-size columns';
         autoSizeBtn.addEventListener('click', () => {
@@ -358,6 +362,7 @@ export class TableRenderer {
             const collapseLabel = this._collapse.getHeaderLabel(col.key);
             if (collapseLabel) {
                 const badge = document.createElement('button');
+                badge.type = 'button';
                 badge.className = C.TH_COLLAPSE;
                 badge.setAttribute('aria-label',
                     `Toggle collapse for column ${col.label}`);
@@ -379,6 +384,7 @@ export class TableRenderer {
                 || cf.regex.trim() !== '';
 
             const filterBtn = document.createElement('button');
+            filterBtn.type = 'button';
             filterBtn.className = C.TH_FILTER_BTN;
             filterBtn.setAttribute('aria-label', `Filter column ${col.label}`);
             filterBtn.textContent = hasFilter ? '⧩' : '⧨';
@@ -492,6 +498,7 @@ export class TableRenderer {
             // Toggle glyph button (before the peek row)
             if (glyph) {
                 const toggleBtn = document.createElement('button');
+                toggleBtn.type = 'button';
                 toggleBtn.className = C.CELL_TOGGLE;
                 toggleBtn.setAttribute('aria-label',
                     collapsed ? 'Expand cell' : 'Collapse cell');
@@ -715,6 +722,7 @@ export class TableRenderer {
      */
     _makeToggle(label, initial, onChange) {
         const btn = document.createElement('button');
+        btn.type = 'button';
         btn.className = 'st-toggle';
         btn.textContent = label;
         btn.setAttribute('aria-pressed', String(initial));
