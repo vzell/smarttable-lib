@@ -15,7 +15,7 @@
  *
  *   Usage via @require (auto-injection, no extra code needed):
  *     // @require .../src/styles.js
- * @version 1.7.0
+ * @version 1.8.0
  */
 
 // ---------------------------------------------------------------------------
@@ -57,6 +57,13 @@
 //              in the column header even when the left zone collapses.
 //          (3) .st-cell-first-row align-items changed from flex-start to center
 //              so the per-cell toggle is vertically centred in the first row.
+// 1.8.0 — Active filter input colorization:
+//          .st-global-input--active: gold border (box-shadow 0 0 0 2px) + dark-amber
+//            text (#7a5400) when the global filter field has non-empty text.
+//          .st-filter-input--active: blue border (box-shadow 0 0 0 2px) + dark-blue
+//            text (#1a5a8a) when a column filter field has non-empty text.
+//          Focus overrides keep the colored border/outline instead of reverting to blue.
+//          box-shadow used (not border-width) to avoid layout shift.
 // 1.7.0 — Four new styles added:
 //          .st-row-count: the "(N of M)" stat chip before the global filter.
 //          .st-tooltip: singleton rich tooltip shown on hover over the stat chip.
@@ -197,6 +204,18 @@ export const STYLES = /* css */`
     outline: 2px solid #3b82f6;
     outline-offset: -1px;
     border-color: #3b82f6;
+}
+
+/* Global filter input: filter text is non-empty — gold border + dark-amber text */
+.st-global-input--active {
+    color: #7a5400;
+    border-color: #e6b800;
+    box-shadow: 0 0 0 2px rgba(230, 184, 0, 0.45);
+    font-weight: 600;
+}
+.st-global-input--active:focus {
+    outline-color: #e6b800;
+    border-color: #e6b800;
 }
 
 /* ✕ clear button inset inside the input */
@@ -740,6 +759,18 @@ export const STYLES = /* css */`
     outline: 2px solid #3b82f6;
     outline-offset: -1px;
     border-color: #3b82f6;
+}
+
+/* Column filter input: filter text is non-empty — blue border + dark-blue text */
+.st-filter-input--active {
+    color: #1a5a8a;
+    border-color: #5ba8d4;
+    box-shadow: 0 0 0 2px rgba(91, 168, 212, 0.45);
+    font-weight: 600;
+}
+.st-filter-input--active:focus {
+    outline-color: #5ba8d4;
+    border-color: #5ba8d4;
 }
 
 /* Row of Cc / Rx / Ex checkboxes below the input */

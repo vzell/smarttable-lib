@@ -7,7 +7,7 @@
  *     1. inject() — create table skeleton + inject trigger button on the page
  *     2. render() — build thead/tbody from current data + filter/sort/collapse state
  *     3. re-render() — called after any state change (filter, sort, collapse toggle)
- * @version 1.7.1
+ * @version 1.8.0
  */
 
 // ---------------------------------------------------------------------------
@@ -43,6 +43,15 @@
 //              field content (cursor to start); second press (empty field) blurs
 //              the input, or closes the dropdown for the quick-filter input.
 //              Dropdown receives a doClose callback (5th ctor arg) to enable this.
+// 1.8.0 — Active filter input colorization:
+//          Global filter input gets st-global-input--active when non-empty:
+//            gold box-shadow border + dark-amber text (#7a5400).
+//          Column filter inputs get st-filter-input--active when non-empty:
+//            blue box-shadow border + dark-blue text (#1a5a8a).
+//          Column filter input initial class set at build time in _buildFilterRow();
+//          toggled immediately in the input event handler for instant feedback.
+//          Global input class synced in _rerender() (input persists across rerenders)
+//          so Escape / ✕ / Clear-ALL paths remove the color without an extra hook.
 // 1.7.1 — Bug fixes:
 //          (1) st-row-count title attribute removed — the native browser tooltip
 //              was appearing after ~1 s and overlapping the rich st-tooltip.
@@ -638,6 +647,7 @@ export class TableRenderer {
                 input.placeholder = col.label;
                 input.title = `Filter ${col.label} — press Escape to clear`;
                 input.value = cf.regex;
+                input.classList.toggle('st-filter-input--active', cf.regex.trim() !== '');
 
                 const colClearBtn = document.createElement('button');
                 colClearBtn.type = 'button';
@@ -654,6 +664,7 @@ export class TableRenderer {
 
                 input.addEventListener('input', () => {
                     const sel = [input.selectionStart, input.selectionEnd];
+                    input.classList.toggle('st-filter-input--active', input.value.trim() !== '');
                     this._setColumnFilter({
                         ...this._getColumnFilter(col.key),
                         regex: input.value,
@@ -1109,6 +1120,12 @@ export class TableRenderer {
 
         // _buildTbody() updated this._displayIdxs — update the stat now
         this._updateRowCount();
+
+        // Sync global input colorization (the input is persistent, not rebuilt)
+        this._globalInput?.classList.toggle(
+            'st-global-input--active',
+            this._filterState.globalRegex.trim() !== ''
+        );
     }
 
     // -------------------------------------------------------------------------
