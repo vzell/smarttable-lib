@@ -1,7 +1,7 @@
 {
     "name": "smarttable-lib",
     "version": "1.0.0",
-    "description": "Site-agnostic library that renders structured web pages into interactive tables via Tampermonkey userscripts",
+    "description": "Pure JS Tampermonkey library — turn any structured web page into a sortable, filterable, collapsible, drag-resizable table; zero runtime dependencies",
     "type": "module",
     "module": "src/index.js",
     "scripts": {
