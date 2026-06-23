@@ -150,13 +150,21 @@ Sites to implement:
 
 ---
 
-## TODO — build pipeline
+## Build pipeline — ✅ Done
 
-No bundler configured yet. Needs:
-- `esbuild` or `rollup` to bundle `src/index.js` → `dist/smarttable.min.js`
-- The bundle must expose `window.SmartTable` (already handled in `src/index.js`)
-- `package.json` with build script
-- `.github/workflows/release.yml` to auto-build on tag push and update `dist/`
+`package.json` + esbuild configured. Commands:
+
+| Script | Output | Purpose |
+|--------|--------|---------|
+| `npm run build` | `dist/smarttable.min.js` (31.5 kB) | Production IIFE, minified, no comments |
+| `npm run build:dev` | `dist/smarttable.js` (241 kB) | Unminified with inline source maps |
+| `npm run watch` | `dist/smarttable.js` | Rebuilds on save during development |
+
+`src/index.js` imports `styles.js` as a side-effect so styles are bundled
+and auto-inject on first load (idempotent).
+
+Still needed:
+- `.github/workflows/release.yml` to auto-build on tag push
 
 ---
 

@@ -1,0 +1,16 @@
+{
+    "name": "smarttable-lib",
+    "version": "1.0.0",
+    "description": "Site-agnostic library that renders structured web pages into interactive tables via Tampermonkey userscripts",
+    "type": "module",
+    "module": "src/index.js",
+    "scripts": {
+        "build": "esbuild src/index.js --bundle --minify --format=iife --target=es2020 --legal-comments=none --outfile=dist/smarttable.min.js",
+        "build:dev": "esbuild src/index.js --bundle --sourcemap=inline --format=iife --target=es2020 --outfile=dist/smarttable.js",
+        "watch": "esbuild src/index.js --bundle --sourcemap=inline --format=iife --target=es2020 --outfile=dist/smarttable.js --watch"
+    },
+    "devDependencies": {
+        "esbuild": "^0.28.0"
+    },
+    "license": "MIT"
+}

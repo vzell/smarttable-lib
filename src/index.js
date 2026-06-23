@@ -4,7 +4,7 @@
  *   Exposes SmartTable.render() as the single entry point for userscripts.
  *   All internal engines are encapsulated inside TableRenderer and not
  *   exported to keep the surface area minimal.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 // ---------------------------------------------------------------------------
@@ -13,8 +13,11 @@
 // 1.0.0 — initial release
 //         SmartTable.render() defined.
 //         Re-exports ColumnDef typedef and META_LABELS for adapter authors.
+// 1.1.0 — import styles.js so the bundle is self-contained (styles auto-inject
+//         on load; idempotent guard prevents double-injection).
 // ---------------------------------------------------------------------------
 
+import './styles.js';
 import { TableRenderer } from './table-renderer.js';
 
 export { META_LABELS } from './filter-engine.js';
