@@ -7,7 +7,7 @@
  *     1. inject() — create table skeleton + inject trigger button on the page
  *     2. render() — build thead/tbody from current data + filter/sort/collapse state
  *     3. re-render() — called after any state change (filter, sort, collapse toggle)
- * @version 1.6.4
+ * @version 1.7.1
  */
 
 // ---------------------------------------------------------------------------
@@ -31,6 +31,27 @@
 //          render with no gap between them; (2) dropdown re-positioned using
 //          position:absolute + scrollX/Y so it anchors to the badge on pages
 //          with CSS transform on ancestors (which breaks position:fixed).
+// 1.7.0 — Four new features:
+//          (1) Row-count stat (st-row-count) before the global filter: shows
+//              "(N of M)" when filters are active, "(N)" otherwise; hovering
+//              shows a rich tooltip (st-tooltip) with per-filter breakdown.
+//          (2) Multi-sort changed from Shift+click to Ctrl+click on ▲/▼ so it
+//              doesn't conflict with text selection.
+//          (3) Dropdown quick-filter search query highlighted in each value item
+//              via Dropdown._highlightText() + <mark class="st-dropdown-match">.
+//          (4) Two-stage Escape in all filter fields: first press clears the
+//              field content (cursor to start); second press (empty field) blurs
+//              the input, or closes the dropdown for the quick-filter input.
+//              Dropdown receives a doClose callback (5th ctor arg) to enable this.
+// 1.7.1 — Bug fixes:
+//          (1) st-row-count title attribute removed — the native browser tooltip
+//              was appearing after ~1 s and overlapping the rich st-tooltip.
+//          (2) Dropdown keyboard UX: second Escape now reliably closes the menu;
+//              ArrowDown/Up navigate between value items; ArrowDown from the
+//              quick-filter input jumps to the first item; ArrowUp from the first
+//              item returns focus to the quick-filter input; Escape anywhere inside
+//              the item list moves focus back to the quick-filter input (handled in
+//              dropdown.js 1.4.0).
 // 1.6.4 — Bug fix: _buildTh() adds st-th-inner--collapsible modifier class only
 //          on collapsible columns so the CSS grid (1fr auto 1fr) for centred
 //          toggle is not applied to non-collapsible columns (which would cause
@@ -113,6 +134,28 @@ const C = {
     FILTER_INPUT:   'st-filter-input',
 };
 
+// ---------------------------------------------------------------------------
+// Shared tooltip singleton (one per page, reused across all TableRenderer instances)
+// ---------------------------------------------------------------------------
+
+/** @type {HTMLElement|null} */
+let _tooltipEl = null;
+
+/**
+ * Returns the singleton tooltip element, creating it lazily on first call.
+ * The element is appended to document.body and styled via the st-tooltip class.
+ *
+ * @returns {HTMLElement}
+ */
+function _ensureTooltip() {
+    if (!_tooltipEl) {
+        _tooltipEl = document.createElement('div');
+        _tooltipEl.className = 'st-tooltip';
+        document.body.appendChild(_tooltipEl);
+    }
+    return _tooltipEl;
+}
+
 // 8 hue pairs for per-priority TD tinting (a = 0.22 α, b = 0.44 α)
 const SHADE_PAIRS = [
     ['st-mscol-0a', 'st-mscol-0b'],
@@ -185,6 +228,9 @@ export class TableRenderer {
         this._autoSizeBtn = null;
         /** True when optimal column widths are currently applied. */
         this._autoSized = false;
+        /** Row-count stat element (updated after every filter/sort cycle). */
+        /** @type {HTMLElement|null} */
+        this._rowCountEl = null;
 
         // Pre-compute unique value counts (stable — rows never change after construction)
         /** @type {Map<string, number>} */
@@ -309,6 +355,8 @@ export class TableRenderer {
             this._autoSizeBtn.textContent = 'Reset width';
             this._autoSizeBtn.title = 'Revert to natural column widths (browser-computed)';
         }
+
+        this._updateRowCount();
     }
 
     /**
@@ -320,6 +368,14 @@ export class TableRenderer {
     _buildGlobalBar() {
         const bar = document.createElement('div');
         bar.className = C.GLOBAL_BAR;
+
+        // ---- Row-count stat ----
+        const rowCountEl = document.createElement('span');
+        rowCountEl.className = 'st-row-count';
+        this._rowCountEl = rowCountEl;
+        rowCountEl.addEventListener('mouseenter', (e) => this._showTooltip(e));
+        rowCountEl.addEventListener('mouseleave', () => this._hideTooltip());
+        bar.appendChild(rowCountEl);
 
         // ---- Input + inset ✕ ----
         const inputWrap = document.createElement('div');
@@ -352,9 +408,16 @@ export class TableRenderer {
 
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                input.value = '';
-                this._filterState.globalRegex = '';
-                this._rerender();
+                e.preventDefault();
+                if ((this._globalInput?.value ?? '').length > 0) {
+                    // First Escape: clear text only, cursor to start
+                    this._filterState.globalRegex = '';
+                    this._rerender();
+                    this._globalInput?.setSelectionRange(0, 0);
+                } else {
+                    // Already empty: blur
+                    this._globalInput?.blur();
+                }
             }
         });
 
@@ -607,11 +670,25 @@ export class TableRenderer {
 
                 input.addEventListener('keydown', (e) => {
                     if (e.key === 'Escape') {
-                        this._setColumnFilter({
-                            ...this._getColumnFilter(col.key),
-                            regex: '',
-                        });
-                        this._rerender();
+                        e.preventDefault();
+                        if (input.value !== '') {
+                            // First Escape: clear text, cursor to start
+                            this._setColumnFilter({
+                                ...this._getColumnFilter(col.key),
+                                regex: '',
+                            });
+                            this._rerender();
+                            const restored = this._tableEl?.querySelector(
+                                `.${C.FILTER_INPUT}[data-colkey="${col.key}"]`
+                            );
+                            if (restored instanceof HTMLInputElement) {
+                                restored.focus();
+                                restored.setSelectionRange(0, 0);
+                            }
+                        } else {
+                            // Already empty: blur
+                            input.blur();
+                        }
                     }
                 });
 
@@ -732,13 +809,13 @@ export class TableRenderer {
 
             const ascActive = sortEntry?.direction === 'asc';
             const ascTitle = ascActive
-                ? `${col.label}: sorting ascending${priLabel} — click to re-sort; Shift+click to add to multi-sort`
-                : `Sort ${col.label} ascending (Shift+click to add to multi-sort)`;
+                ? `${col.label}: sorting ascending${priLabel} — click to re-sort; Ctrl+click to add to multi-sort`
+                : `Sort ${col.label} ascending (Ctrl+click to add to multi-sort)`;
             const ascBtn = this._makeSortIcon(
                 '▲' + (ascActive ? priSuffix : ''),
                 ascTitle,
                 (e) => {
-                    if (!e.shiftKey) this._sort.clearSort();
+                    if (!e.ctrlKey) this._sort.clearSort();
                     this._sort.pushSort(col.key, 'asc');
                     this._rerender();
                 }
@@ -747,13 +824,13 @@ export class TableRenderer {
 
             const descActive = sortEntry?.direction === 'desc';
             const descTitle = descActive
-                ? `${col.label}: sorting descending${priLabel} — click to re-sort; Shift+click to add to multi-sort`
-                : `Sort ${col.label} descending (Shift+click to add to multi-sort)`;
+                ? `${col.label}: sorting descending${priLabel} — click to re-sort; Ctrl+click to add to multi-sort`
+                : `Sort ${col.label} descending (Ctrl+click to add to multi-sort)`;
             const descBtn = this._makeSortIcon(
                 '▼' + (descActive ? priSuffix : ''),
                 descTitle,
                 (e) => {
-                    if (!e.shiftKey) this._sort.clearSort();
+                    if (!e.ctrlKey) this._sort.clearSort();
                     this._sort.pushSort(col.key, 'desc');
                     this._rerender();
                 }
@@ -1029,6 +1106,9 @@ export class TableRenderer {
 
         // Re-attach so colgroup is rebuilt; stored widths are re-applied.
         this._resize.attach(this._tableEl);
+
+        // _buildTbody() updated this._displayIdxs — update the stat now
+        this._updateRowCount();
     }
 
     // -------------------------------------------------------------------------
@@ -1061,6 +1141,20 @@ export class TableRenderer {
             this._rows, col.key, this._allIdxs
         );
 
+        // doClose is forward-declared so it can be passed to the Dropdown
+        // constructor before closeHandler is defined.  Both are closures over the
+        // same 'closeHandler' variable; by the time either is invoked the variable
+        // has been fully initialised below.
+        /** @type {(e: MouseEvent) => void} */
+        let closeHandler;
+
+        const doClose = () => {
+            dropdown.destroy();
+            this._openDropdown       = null;
+            this._openDropdownColKey = null;
+            document.removeEventListener('click', closeHandler);
+        };
+
         const dropdown = new Dropdown(
             col,
             { metaEntryKeys, uniqueValues },
@@ -1068,7 +1162,8 @@ export class TableRenderer {
             (updatedFilter) => {
                 this._setColumnFilter(updatedFilter);
                 this._rerender();
-            }
+            },
+            doClose        // onClose: called when user presses Escape on empty quick-filter
         );
 
         // Get the viewport rect of the badge button (event.currentTarget) —
@@ -1090,15 +1185,157 @@ export class TableRenderer {
         this._openDropdown       = dropdown;
         this._openDropdownColKey = col.key;
 
-        const closeHandler = (e) => {
+        closeHandler = (e) => {
             if (!dropEl.contains(e.target)) {
-                dropdown.destroy();
-                this._openDropdown       = null;
-                this._openDropdownColKey = null;
-                document.removeEventListener('click', closeHandler);
+                doClose();
             }
         };
         setTimeout(() => document.addEventListener('click', closeHandler), 0);
+    }
+
+    // -------------------------------------------------------------------------
+    // Row-count stat + tooltip
+    // -------------------------------------------------------------------------
+
+    /**
+     * Updates the row-count stat element text to reflect the current visible
+     * vs total row counts. Called after every filter/sort cycle.
+     *
+     * @returns {void}
+     */
+    _updateRowCount() {
+        if (!this._rowCountEl) return;
+        const total   = this._rows.length;
+        const visible = this._displayIdxs.length;
+        const hasGlobal  = this._filterState.globalRegex.trim() !== '';
+        const activeCols = this._filterState.columnFilters.filter(
+            cf => cf.regex.trim() !== ''
+               || cf.valueEntries.length > 0
+               || cf.metaEntries.length > 0
+        );
+        const isFiltered = hasGlobal || activeCols.length > 0;
+        this._rowCountEl.textContent = isFiltered
+            ? `(${visible.toLocaleString()} of ${total.toLocaleString()})`
+            : `(${total.toLocaleString()})`;
+    }
+
+    /**
+     * Shows the singleton tooltip near the given mouse event target.
+     *
+     * @param {MouseEvent} event
+     * @returns {void}
+     */
+    _showTooltip(event) {
+        const tt = _ensureTooltip();
+        while (tt.firstChild) tt.removeChild(tt.firstChild);
+        this._buildTooltipContent(tt);
+        tt.style.display = 'block';
+        const rect = /** @type {HTMLElement} */ (event.currentTarget).getBoundingClientRect();
+        tt.style.top  = `${rect.bottom + 4}px`;
+        tt.style.left = `${rect.left}px`;
+        // Clamp to viewport after the browser has measured the tooltip width
+        requestAnimationFrame(() => {
+            const ttRect = tt.getBoundingClientRect();
+            if (ttRect.right > window.innerWidth - 8) {
+                tt.style.left = `${Math.max(8, window.innerWidth - ttRect.width - 8)}px`;
+            }
+        });
+    }
+
+    /**
+     * Hides the singleton tooltip.
+     *
+     * @returns {void}
+     */
+    _hideTooltip() {
+        _ensureTooltip().style.display = 'none';
+    }
+
+    /**
+     * Populates `container` with safe DOM nodes describing the current filter
+     * state (global filter, column filters) and row counts.
+     * Mirrors the ShowAllEntityData mb-row-count-stat tooltip format.
+     * All user-supplied filter values are set via textContent — never innerHTML.
+     *
+     * @param {HTMLElement} container
+     * @returns {void}
+     */
+    _buildTooltipContent(container) {
+        const total      = this._rows.length;
+        const visible    = this._displayIdxs.length;
+        const hasGlobal  = this._filterState.globalRegex.trim() !== '';
+        const activeCols = this._filterState.columnFilters.filter(
+            cf => cf.regex.trim() !== ''
+               || cf.valueEntries.length > 0
+               || cf.metaEntries.length > 0
+        );
+
+        /** Build a styled inline badge span. */
+        const badge = (text, bg, fg, bold, italic) => {
+            const s = document.createElement('span');
+            const parts = [`background:${bg}`, `color:${fg}`, 'border-radius:2px', 'padding:0 3px'];
+            if (bold)   parts.push('font-weight:bold');
+            if (italic) parts.push('font-style:italic');
+            s.style.cssText = parts.join(';');
+            s.textContent = text;
+            return s;
+        };
+        const t = (text) => document.createTextNode(text);
+
+        container.appendChild(t('There are '));
+        container.appendChild(badge(visible.toLocaleString(), '#e8e8e8', '#111', true, false));
+        container.appendChild(t(' rows visible'));
+
+        if (hasGlobal || activeCols.length > 0) {
+            container.appendChild(t(' after the '));
+
+            if (hasGlobal) {
+                container.appendChild(badge('global', '#FFD700', 'red', false, true));
+                container.appendChild(t(' filter '));
+                const gf = document.createElement('span');
+                gf.style.fontStyle = 'italic';
+                gf.textContent = this._filterState.globalRegex;
+                container.appendChild(gf);
+            }
+
+            if (hasGlobal && activeCols.length > 0) {
+                container.appendChild(t(' and '));
+            }
+
+            if (activeCols.length > 0) {
+                container.appendChild(badge('column', '#add8e6', 'red', false, true));
+                container.appendChild(t(` filter${activeCols.length > 1 ? 's' : ''} `));
+
+                activeCols.forEach((cf, i) => {
+                    if (i > 0) container.appendChild(t(', '));
+                    const colDef = this._columns.find(c => c.key === cf.colKey);
+                    const nameSpan = document.createElement('span');
+                    nameSpan.style.cssText = 'color:#2563eb;font-weight:bold';
+                    nameSpan.textContent = `'${colDef?.label ?? cf.colKey}'`;
+                    container.appendChild(nameSpan);
+
+                    let filterText = '';
+                    if (cf.regex.trim() !== '') {
+                        filterText = cf.regex;
+                    } else if (cf.valueEntries.length > 0) {
+                        filterText = cf.valueEntries.join(' | ');
+                    } else if (cf.metaEntries.length > 0) {
+                        filterText = cf.metaEntries.join(', ');
+                    }
+                    if (filterText) {
+                        container.appendChild(t(':'));
+                        const val = document.createElement('span');
+                        val.style.fontStyle = 'italic';
+                        val.textContent = filterText;
+                        container.appendChild(val);
+                    }
+                });
+            }
+        }
+
+        container.appendChild(t(' from '));
+        container.appendChild(badge(total.toLocaleString(), '#e8e8e8', '#111', true, false));
+        container.appendChild(t(' total rows in this table'));
     }
 
     // -------------------------------------------------------------------------
@@ -1185,7 +1422,7 @@ export class TableRenderer {
     /**
      * Creates a sort icon <button> (⇅, ▲, or ▼).
      * The event is forwarded to the callback so callers can inspect modifiers
-     * (e.g. Shift+click to add to multi-sort rather than replacing it).
+     * (e.g. Ctrl+click to add to multi-sort rather than replacing it).
      *
      * @param {string}                    glyph
      * @param {string}                    title

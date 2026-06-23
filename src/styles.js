@@ -15,7 +15,7 @@
  *
  *   Usage via @require (auto-injection, no extra code needed):
  *     // @require .../src/styles.js
- * @version 1.6.0
+ * @version 1.7.0
  */
 
 // ---------------------------------------------------------------------------
@@ -57,6 +57,13 @@
 //              in the column header even when the left zone collapses.
 //          (3) .st-cell-first-row align-items changed from flex-start to center
 //              so the per-cell toggle is vertically centred in the first row.
+// 1.7.0 — Four new styles added:
+//          .st-row-count: the "(N of M)" stat chip before the global filter.
+//          .st-tooltip: singleton rich tooltip shown on hover over the stat chip.
+//          .st-dropdown-match: <mark> highlight for quick-filter matches inside
+//            unique-value dropdown items (gold background, same as st-highlight).
+//          Also added .st-th-inner--collapsible: CSS grid (1fr auto 1fr) modifier
+//          applied only to collapsible column headers (non-collapsible keeps flex).
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -127,6 +134,43 @@ export const STYLES = /* css */`
     gap: 6px;
     padding: 6px 2px;
     flex-wrap: wrap;
+}
+
+/* ---- Row-count stat (before the global filter input) ---- */
+.st-row-count {
+    font-size: 12px;
+    color: #888;
+    white-space: nowrap;
+    cursor: default;
+    padding: 2px 5px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.st-row-count:hover {
+    background: #f0f0f2;
+    border-color: #d0d2d8;
+    color: #444;
+}
+
+/* ---- Rich tooltip (appears on hover over the row-count stat) ---- */
+.st-tooltip {
+    position: fixed;
+    z-index: 99999;
+    max-width: 440px;
+    padding: 8px 12px;
+    background: #fff;
+    border: 1px solid #c8cad0;
+    border-radius: 5px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.14), 0 1px 4px rgba(0, 0, 0, 0.08);
+    font-size: 13px;
+    font-family: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    pointer-events: none;
+    color: #222;
+    display: none;
 }
 
 /* Wrapper for input + inset ✕ button */
@@ -648,6 +692,14 @@ export const STYLES = /* css */`
     color: #bbb;
     font-style: italic;
     font-size: 12px;
+}
+
+/* Highlight for the quick-filter search query inside each value-item label */
+.st-dropdown-match {
+    background: #FFD700;
+    color: #111;
+    border-radius: 2px;
+    padding: 0 1px;
 }
 
 /* ============================================================

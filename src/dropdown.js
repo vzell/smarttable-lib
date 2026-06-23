@@ -8,7 +8,7 @@
  *   The dropdown is a plain HTMLElement (no shadow DOM) so it inherits the
  *   host page's scrolling and z-index context. Callers are responsible for
  *   positioning it relative to the column header.
- * @version 1.2.0
+ * @version 1.4.0
  */
 
 // ---------------------------------------------------------------------------
@@ -21,6 +21,25 @@
 //          so the field survives round-trips through the dropdown onChange handler.
 // 1.2.0 — Defer input.focus() with setTimeout(0) so the caller can set position
 //          styles before the browser scrolls to the newly focused element.
+// 1.3.0 — onClose callback added to constructor (5th arg); called when the user
+//          presses Escape on an already-empty quick filter to signal the host to
+//          close the dropdown rather than just clearing the input.
+//          Two-stage Escape: first press clears non-empty quick filter; second
+//          press (empty field) calls onClose?.().
+//          _highlightText(): highlights the quick-filter search query inside each
+//          value item label using <mark class="st-dropdown-match"> elements.
+// 1.4.0 — Keyboard UX improvements:
+//          this._quickInput stores the live input reference so other methods can
+//          focus it programmatically.
+//          Escape in the quick-filter input now calls stopPropagation so it never
+//          leaks to the root handler; input.focus() called after clearing to survive
+//          any focus loss caused by _refreshValuesList rebuilding DOM nodes.
+//          ArrowDown/ArrowUp on the quick-filter input navigate to the first/last
+//          value item respectively.
+//          Root-level keydown handler added in build(): ArrowDown/ArrowUp move
+//          between value/meta items; ArrowUp from the topmost item returns focus
+//          to the quick-filter input; Escape from any item (not the input, which
+//          already stops propagation) returns focus to the quick-filter input.
 // ---------------------------------------------------------------------------
 
 import { META_LABELS } from './filter-engine.js';
@@ -58,15 +77,21 @@ export class Dropdown {
      * @param {Array<{value: string, count: number}>} data.uniqueValues
      * @param {ColumnFilter} initialFilter         - Current filter state for this column.
      * @param {function(ColumnFilter): void} onChange - Called whenever filter state changes.
+     * @param {function(): void} [onClose] - Called when the user presses Escape on an
+     *   already-empty quick filter to request closing the dropdown.
      */
-    constructor(colDef, data, initialFilter, onChange) {
+    constructor(colDef, data, initialFilter, onChange, onClose) {
         this._def     = colDef;
         this._data    = data;
         this._filter  = this._cloneFilter(initialFilter);
         this._onChange = onChange;
+        this._onClose  = onClose ?? null;
 
         /** @type {HTMLElement|null} */
         this._root = null;
+
+        /** @type {HTMLInputElement|null} The quick-filter text input (set during build). */
+        this._quickInput = null;
 
         /** @type {string} Quick filter input value */
         this._quickFilter = '';
@@ -109,13 +134,42 @@ export class Dropdown {
         container.appendChild(root);
         this._root = root;
 
+        // Root-level keyboard navigation.
+        // Escape is stopped in the quick-filter input's own handler (stopPropagation)
+        // so this listener only sees Escape events from value/meta items — in which case
+        // we return focus to the quick-filter input.
+        // ArrowDown/Up from items is handled here; ArrowDown/Up from the input is
+        // handled in _buildQuickFilterSection (also stopPropagation, so no double-run).
+        root.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                const items = /** @type {HTMLElement[]} */ (
+                    Array.from(root.querySelectorAll(`.${C.ITEM}`))
+                );
+                const idx = items.indexOf(/** @type {any} */ (document.activeElement));
+                if (idx !== -1) {
+                    e.preventDefault();
+                    if (e.key === 'ArrowUp' && idx === 0) {
+                        // Wrap: top of list → back to quick-filter input
+                        this._quickInput?.focus();
+                    } else {
+                        const next = e.key === 'ArrowDown' ? idx + 1 : idx - 1;
+                        items[Math.max(0, Math.min(items.length - 1, next))]?.focus();
+                    }
+                }
+            } else if (e.key === 'Escape') {
+                // Only reaches here from non-input elements (input calls stopPropagation)
+                e.preventDefault();
+                e.stopPropagation();
+                this._quickInput?.focus();
+            }
+        });
+
         // Defer focus until the caller has had a chance to set position styles.
         // Without deferral the browser scrolls to show the un-positioned element
         // (which is appended at the end of the document body) before the caller
         // can place it near the badge button.
-        const input = root.querySelector(`.${C.QUICK_INPUT}`);
-        if (input instanceof HTMLElement) {
-            setTimeout(() => input.focus(), 0);
+        if (this._quickInput) {
+            setTimeout(() => this._quickInput?.focus(), 0);
         }
 
         return root;
@@ -128,7 +182,8 @@ export class Dropdown {
      */
     destroy() {
         this._root?.remove();
-        this._root = null;
+        this._root       = null;
+        this._quickInput = null;
     }
 
     /**
@@ -186,12 +241,44 @@ export class Dropdown {
             if (e.key === 'Enter') {
                 this._confirmQuickFilter();
             } else if (e.key === 'Escape') {
-                input.value = '';
-                this._quickFilter = '';
-                this._refreshValuesList();
+                // stopPropagation prevents the root handler from also seeing this
+                // and trying to focus an already-destroyed input after onClose().
+                e.preventDefault();
+                e.stopPropagation();
+                if (input.value !== '') {
+                    // First Escape: clear the search input, cursor to start.
+                    // input.focus() after _refreshValuesList() guards against any
+                    // focus loss that occurs when the values section is rebuilt.
+                    input.value = '';
+                    input.setSelectionRange(0, 0);
+                    this._quickFilter = '';
+                    this._refreshValuesList();
+                    input.focus();
+                } else {
+                    // Second Escape (already empty): signal host to close
+                    this._onClose?.();
+                }
+            } else if (e.key === 'ArrowDown') {
+                // Navigate to the first value/meta item in the list
+                e.preventDefault();
+                e.stopPropagation();
+                const firstItem = /** @type {HTMLElement|null} */ (
+                    this._root?.querySelector(`.${C.ITEM}`)
+                );
+                firstItem?.focus();
+            } else if (e.key === 'ArrowUp') {
+                // Navigate to the last value/meta item in the list
+                e.preventDefault();
+                e.stopPropagation();
+                const items = this._root?.querySelectorAll(`.${C.ITEM}`);
+                if (items && items.length > 0) {
+                    /** @type {HTMLElement} */ (items[items.length - 1]).focus();
+                }
             }
         });
 
+        // Store reference so build() and destroy() can focus/clear it
+        this._quickInput = input;
         section.appendChild(input);
         return section;
     }
@@ -255,12 +342,51 @@ export class Dropdown {
                 this._toggleValue(value);
             });
 
+            // Highlight the quick-filter query inside the label text
+            if (this._quickFilter) {
+                const labelEl = item.querySelector('.st-dropdown-item-label');
+                if (labelEl instanceof HTMLElement) {
+                    labelEl.textContent = '';
+                    this._highlightText(labelEl, value, this._quickFilter);
+                }
+            }
+
             const countEl = document.createElement('span');
             countEl.className = C.COUNT;
             countEl.textContent = String(count);
             item.appendChild(countEl);
 
             section.appendChild(item);
+        }
+    }
+
+    /**
+     * Renders text into a container, wrapping occurrences of query in
+     * <mark class="st-dropdown-match"> elements for visual highlighting.
+     * Uses textContent only — safe from XSS even with user-supplied query.
+     *
+     * @param {HTMLElement} container
+     * @param {string}      text    - Full value string.
+     * @param {string}      query   - The quick-filter search string (literal, case-insensitive).
+     * @returns {void}
+     */
+    _highlightText(container, text, query) {
+        const lower  = text.toLowerCase();
+        const lowerQ = query.toLowerCase();
+        let pos = 0;
+        let idx;
+        while ((idx = lower.indexOf(lowerQ, pos)) !== -1) {
+            if (idx > pos) {
+                container.appendChild(document.createTextNode(text.slice(pos, idx)));
+            }
+            const mark = document.createElement('mark');
+            mark.className = 'st-dropdown-match';
+            mark.textContent = text.slice(idx, idx + query.length);
+            container.appendChild(mark);
+            pos = idx + query.length;
+        }
+        if (pos < text.length) {
+            container.appendChild(document.createTextNode(text.slice(pos)));
         }
     }
 
