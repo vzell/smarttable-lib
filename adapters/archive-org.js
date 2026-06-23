@@ -26,13 +26,14 @@
  *   GM_xmlhttpRequest is preferred over fetch() to avoid cross-origin issues
  *   in strict Tampermonkey environments. The adapter detects whichever is
  *   available at runtime.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 // ---------------------------------------------------------------------------
 // CHANGELOG
 // ---------------------------------------------------------------------------
 // 1.0.0 — initial release
+// 1.1.0 — url column uses ColumnDef.render to produce a clickable <a> link.
 // ---------------------------------------------------------------------------
 
 /** @typedef {import('../src/types.js').ColumnDef}    ColumnDef */
@@ -55,7 +56,13 @@ const ARCHIVE_ORG_COLUMNS = [
     { key: 'recType',   label: 'Type',      type: 'string', width: '110px' },
     { key: 'downloads', label: 'Downloads', type: 'number', width: '95px' },
     { key: 'addeddate', label: 'Added',     type: 'date',   width: '105px' },
-    { key: 'url',       label: 'Link',      type: 'string', sortable: false, filterable: false },
+    { key: 'url',       label: 'Link',      type: 'string', sortable: false, filterable: false,
+      render: (url) => {
+          const a = document.createElement('a');
+          a.href = url; a.textContent = 'Open';
+          a.target = '_blank'; a.rel = 'noopener noreferrer';
+          return a;
+      } },
 ];
 
 // ---------------------------------------------------------------------------

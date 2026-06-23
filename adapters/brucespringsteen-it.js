@@ -28,13 +28,14 @@
  *     rows:      BrucespringsteenitAdapter.extract(),
  *     container: document.querySelector(BrucespringsteenitAdapter.triggerSelector),
  *   });
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 // ---------------------------------------------------------------------------
 // CHANGELOG
 // ---------------------------------------------------------------------------
 // 1.0.0 — initial release
+// 1.1.0 — detailUrl column uses ColumnDef.render to produce a clickable <a> link.
 // ---------------------------------------------------------------------------
 
 /** @typedef {import('../src/types.js').ColumnDef}    ColumnDef */
@@ -53,7 +54,13 @@ const UNOFFICIAL_COLUMNS = [
     { key: 'catalogue', label: 'Matrix',    type: 'string', width: '130px' },
     { key: 'isPromo',   label: 'Promo',     type: 'string', width: '56px' },
     { key: 'notes',     label: 'Notes',     type: 'string' },
-    { key: 'detailUrl', label: 'Link',      type: 'string', sortable: false, filterable: false },
+    { key: 'detailUrl', label: 'Link',      type: 'string', sortable: false, filterable: false,
+      render: (url) => {
+          const a = document.createElement('a');
+          a.href = url; a.textContent = 'Detail';
+          a.target = '_blank'; a.rel = 'noopener noreferrer';
+          return a;
+      } },
 ];
 
 /** @type {ColumnDef[]} */
@@ -65,7 +72,13 @@ const OFFICIAL_COLUMNS = [
     { key: 'catalogue', label: 'Catalogue', type: 'string', width: '150px' },
     { key: 'isPromo',   label: 'Promo',     type: 'string', width: '56px' },
     { key: 'notes',     label: 'Notes',     type: 'string' },
-    { key: 'detailUrl', label: 'Link',      type: 'string', sortable: false, filterable: false },
+    { key: 'detailUrl', label: 'Link',      type: 'string', sortable: false, filterable: false,
+      render: (url) => {
+          const a = document.createElement('a');
+          a.href = url; a.textContent = 'Detail';
+          a.target = '_blank'; a.rel = 'noopener noreferrer';
+          return a;
+      } },
 ];
 
 // ---------------------------------------------------------------------------

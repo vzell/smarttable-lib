@@ -23,13 +23,14 @@
  *     rows:      BrucebaseAdapter.extract(),
  *     container: document.querySelector(BrucebaseAdapter.triggerSelector),
  *   });
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 // ---------------------------------------------------------------------------
 // CHANGELOG
 // ---------------------------------------------------------------------------
 // 1.0.0 — initial release
+// 1.1.0 — url column uses ColumnDef.render to produce a clickable <a> link.
 // ---------------------------------------------------------------------------
 
 /** @typedef {import('../src/types.js').ColumnDef}    ColumnDef */
@@ -57,7 +58,13 @@ const BRUCEBASE_COLUMNS = [
     { key: 'hasBootleg', label: 'Bootleg',   type: 'string', width: '70px' },
     { key: 'hasSetlist', label: 'Setlist?',  type: 'string', width: '70px' },
     { key: 'resources',  label: 'Resources', type: 'string', width: '160px', sortable: false },
-    { key: 'url',        label: 'Link',      type: 'string', sortable: false, filterable: false },
+    { key: 'url',        label: 'Link',      type: 'string', sortable: false, filterable: false,
+      render: (url) => {
+          const a = document.createElement('a');
+          a.href = url; a.textContent = 'Open';
+          a.target = '_blank'; a.rel = 'noopener noreferrer';
+          return a;
+      } },
 ];
 
 // ---------------------------------------------------------------------------
