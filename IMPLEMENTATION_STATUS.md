@@ -7,11 +7,11 @@
 | `src/types.js` | ✅ Done | All typedefs defined |
 | `src/cell-inspector.js` | ✅ Done | `inspectCell()`, `inspectCells()` |
 | `src/collapse-engine.js` | ✅ Done | Full CollapseEngine class |
-| `src/filter-engine.js` | ✅ Done | META_PREDICATES, FilterEngine, four-stage pipeline |
-| `src/sort-engine.js` | ✅ Done | Multi-column sort, shading snapshot |
+| `src/filter-engine.js` | ✅ Done | META_PREDICATES, FilterEngine, four-stage pipeline; `escapeRegex()`, `buildHighlightPattern()` exported |
+| `src/sort-engine.js` | ✅ Done | Multi-column sort, shading snapshot; first-sort shading bug fixed |
 | `src/dropdown.js` | ✅ Done | Three-section dropdown, Dropdown class, `emptyColumnFilter()` |
 | `src/resize-engine.js` | ✅ Done | ResizeEngine, off-screen ruler, drag state machine |
-| `src/table-renderer.js` | ✅ Done | ResizeEngine fully wired; derived column support |
+| `src/table-renderer.js` | ✅ Done | ResizeEngine fully wired; derived column support; `ColumnDef.render` callback; permanent filter row; match highlighting |
 | `src/index.js` | ✅ Done | `SmartTable.render()` public API |
 
 ---
@@ -61,27 +61,38 @@
 | `st-dropdown-count` | span | Occurrence count in unique values list |
 | `st-dropdown-no-results` | div | Shown when quick filter matches nothing |
 | `st-dropdown-divider` | hr | Divider between sections |
+| `st-filter-row` | tr | Second header row (permanent filter inputs) |
+| `st-filter-th` | th | Cell in the filter row |
+| `st-filter-input` | input | Per-column text filter input; `data-colkey` attribute used for focus-restore after re-render |
+| `st-filter-regex-btn` | button | Plain-text ↔ regex toggle; `data-active="true"` when regex mode is on |
+| `st-highlight` | mark | Wraps matching substrings in filtered cell text (yellow background) |
 
 ---
 
-## TODO — adapters
+## Adapters — ✅ Done
 
-No adapter files exist yet. Each needs to implement the interface contract:
+| File | Status | Notes |
+|------|--------|-------|
+| `adapters/jungleland.js` | ✅ Done | `JunglelandAdapter`; sets `window.JunglelandAdapter` global |
+| `adapters/brucespringsteen-it.js` | ✅ Done | `BrucespringsteenitAdapter`; dual-mode via `tipe` query param |
+| `adapters/archive-org.js` | ✅ Done | `ArchiveOrgAdapter`; async `extract()` using `advancedsearch.php` JSON API |
+| `adapters/brucebase.js` | ✅ Done | `BrucebaseAdapter`; splits `#page-content` on `<HR>` elements |
 
-```js
-// adapters/jungleland.js
-export default {
-    triggerSelector: '…',
-    columnDefs: [ /* ColumnDef[] */ ],
-    extract() { /* return NormalizedRow[] */ }
-}
-```
+All adapters expose a `window.XxxAdapter` global (not ES module `export default`)
+for Tampermonkey `@require` compatibility.
 
-Sites to implement:
-- [ ] `adapters/jungleland.js` — https://www.jungleland.it/html/list.htm
-- [ ] `adapters/brucespringsteen-it.js` — https://www.brucespringsteen.it/DB/records.aspx (official + unofficial, distinguished by `tipe` query param)
-- [ ] `adapters/archive-org.js` — https://archive.org/search (bootleg search, year-filtered)
-- [ ] `adapters/brucebase.js` — http://brucebase.wikidot.com/YYYY (events by year)
+## Userscripts
+
+| File | Type | Notes |
+|------|------|-------|
+| `userscripts/jungleland-it.user.js` | Production | `@require` via raw.githubusercontent.com |
+| `userscripts/brucespringsteen-it.user.js` | Production | |
+| `userscripts/archive-org.user.js` | Production | `@grant GM_xmlhttpRequest` |
+| `userscripts/brucebase.user.js` | Production | pathname guard `/^\\/\\d{4}$/` |
+| `userscripts/jungleland-it.dev.user.js` | Dev | `@require file:///V:/…` (Windows WSL2 path) |
+| `userscripts/brucespringsteen-it.dev.user.js` | Dev | |
+| `userscripts/archive-org.dev.user.js` | Dev | |
+| `userscripts/brucebase.dev.user.js` | Dev | |
 
 ---
 

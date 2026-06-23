@@ -42,6 +42,19 @@
 - "Case" toggle: case-sensitive matching.
 - Tests all column text values for each row (any column match = row passes).
 
+### Permanent filter row (second header row)
+A second `<tr>` in `<thead>` is always visible, immediately below the column
+headers. It contains one `<input>` per filterable column (`filterable !== false`).
+
+- Typing updates `ColumnFilter.regex` on every keystroke and re-renders.
+- Focus and cursor position are restored after each re-render so typing is seamless.
+- Default mode: **plain-text substring** — the input value is escaped before
+  being compiled as a `RegExp`, so characters like `(`, `.`, `*` are treated
+  literally.
+- **`.*` toggle button** per column: switches to full **regex mode**
+  (`ColumnFilter.isRegex = true`). The button turns blue when regex mode is on.
+- The filter row is sticky together with the header row (both share `<thead>`).
+
 ### Per-column filter dropdown (three sections)
 Opened by clicking the filter icon `⧨` / `⧩` in the column header.
 The icon becomes `⧩` and the header gets class `st-th--filter-active`
@@ -73,13 +86,27 @@ Selections within section A are OR-combined.
 ### Filter pipeline order
 
 ```
-Meta filter → Value filter → Column regex → Global regex
+Meta filter → Value filter → Column text/regex → Global regex
 ```
 
 Each stage receives only rows that passed the previous stage.
 Filtering across columns is AND-combined.
-Regex fields accept any valid JavaScript `RegExp` pattern; invalid patterns
-are silently ignored (treated as empty).
+When `ColumnFilter.isRegex` is `false` (default), the column filter text is
+escaped with `escapeRegex()` before compilation, enabling safe literal matching.
+When `true`, the text is compiled as a raw `RegExp`. Invalid patterns are silently
+ignored (treated as empty). The global filter bar is always regex mode.
+
+### Filter match highlighting
+
+When any filter is active (column or global), matching substrings in cell text
+are wrapped in `<mark class="st-highlight">` (yellow background).
+
+- Both column-level and global filter patterns contribute highlights.
+- Overlapping match ranges are merged before rendering.
+- Cells with a `ColumnDef.render` callback are **not highlighted** — the
+  custom DOM is rendered as-is.
+- Highlight patterns are pre-computed once at the start of each `_buildTbody()`
+  call so the overhead per cell is minimal.
 
 ---
 

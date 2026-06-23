@@ -159,7 +159,11 @@ ColumnFilter {
     colKey:       string     // column this filter applies to
     metaEntries:  string[]   // selected meta predicate keys (OR within column)
     valueEntries: string[]   // selected unique text values (OR within column)
-    regex:        string     // column-level regex (empty = inactive)
+    regex:        string     // column-level filter text (empty = inactive)
+    isRegex:      boolean    // false (default) = literal substring match (text is
+                             //   escaped before RegExp compilation); true = treat
+                             //   regex as a full JS regex pattern. Toggled via the
+                             //   '.*' button in the permanent filter row.
     regexExclude: boolean    // true = exclusion filter
     regexCase:    boolean    // true = case-sensitive
 }

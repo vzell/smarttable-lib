@@ -1,5 +1,28 @@
 [
     {
+        "version": "1.1.0",
+        "date": "2026-06-23",
+        "summary": "Filter row, regex/plain-text toggle, match highlighting, render callback, shading fix, dev workflow.",
+        "added": [
+            "ColumnDef.render callback — (value, row) => Node | string; custom display per sub-row without affecting sort or filter",
+            "Permanent filter row — second <tr> in <thead>, always visible; one text input per filterable column; focus and cursor restored after re-render",
+            "ColumnFilter.isRegex — boolean field (default false); when false, filter text is escaped and matched literally; when true, compiled as a full JS regex pattern",
+            "Per-column regex toggle button ('.*') in filter row — turns blue when regex mode is active",
+            "Match highlighting — active filter matches wrapped in <mark class='st-highlight'> (yellow); both column-level and global patterns contribute; overlapping ranges merged; cells with col.render excluded",
+            "escapeRegex() and buildHighlightPattern() exported from filter-engine.js for reuse by the renderer",
+            "Four new CSS classes: st-filter-row, st-filter-th, st-filter-input, st-filter-regex-btn",
+            "All four adapters implemented: jungleland.js, brucespringsteen-it.js, archive-org.js, brucebase.js",
+            "Production userscripts for all four sites (raw.githubusercontent.com @require)",
+            "Dev userscripts for all four sites (file:///V:/… @require for Windows WSL2 Chrome/Tampermonkey)",
+            "npm run watch — esbuild watch mode rebuilds dist/smarttable.js on every source change"
+        ],
+        "notes": [
+            "First-sort shading was broken: _prevValues was seeded from _currValues, which was empty before the first sort. Fixed by seeding _currValues from pre-sort positions for any untracked column before the snapshot copy.",
+            "Dev userscripts use file:///V:/home/vzell/… paths — the V: drive maps the WSL2 filesystem in Windows Chrome/Tampermonkey.",
+            "dist/smarttable.js (dev build with inline sourcemaps) is gitignored; run npm run build:dev or npm run watch to generate it locally."
+        ]
+    },
+    {
         "version": "1.0.0",
         "date": "2026-06-23",
         "summary": "Initial release — full-featured interactive table library for Tampermonkey userscripts.",
