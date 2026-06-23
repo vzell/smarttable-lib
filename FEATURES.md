@@ -25,12 +25,14 @@
 - Primary sort first; ties broken by next sort entry in stack.
 - Sort key for multi-row cells: first sub-row string only.
 
-**Value shading:**
-- After each sort, `SortEngine` snapshots previous cell positions.
-- Cells whose value changed display position get class `st-shading-changed`.
-- Class is auto-removed after `TableOptions.shadingDurationMs` (default 600 ms)
-  so the transition can re-trigger on subsequent sorts.
-- Shading can be disabled with `TableOptions.shadingEnabled: false`.
+**Value-group shading:**
+- When a sort is active, each `<tr>` receives either `st-shade-a` (white) or
+  `st-shade-b` (light blue) based on the primary sort column's value.
+- Consecutive rows sharing the same value stay in the same shade group.
+- The group alternates whenever the primary sort column's value changes between
+  adjacent rows — visually grouping, e.g., all 1966 rows and all 1967 rows.
+- Classes are re-computed on every re-render; no timer or animation involved.
+- Disabled when `TableOptions.shadingEnabled` is `false`.
 
 ---
 

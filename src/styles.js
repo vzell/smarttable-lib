@@ -6,8 +6,8 @@
  *   script via Tampermonkey @require (idempotent — second load is a no-op).
  *
  *   All selectors use the "st-" namespace prefix so they never clash with
- *   the host page. No !important is used except on the transient shading
- *   class (.st-shading-changed) which must override alternating row colours.
+ *   the host page. No !important is used except on value-group shading
+ *   (.st-shade-a / .st-shade-b) which must override nth-child zebra colours.
  *
  *   Usage in a userscript (bundled):
  *     import { STYLES } from './styles.js';
@@ -15,7 +15,7 @@
  *
  *   Usage via @require (auto-injection, no extra code needed):
  *     // @require .../src/styles.js
- * @version 1.2.0
+ * @version 1.3.0
  */
 
 // ---------------------------------------------------------------------------
@@ -27,6 +27,9 @@
 //         tbody/tr/td, sub-rows, cell-toggle, shading, dropdown.
 // 1.2.0 — filter row styles (st-filter-row, st-filter-th, st-filter-input,
 //          st-filter-regex-btn) and match highlight (mark.st-highlight).
+// 1.3.0 — value-group shading replaces position-change flash shading
+//          st-shading-changed removed; st-shade-a / st-shade-b added.
+//          Applied to <tr> by the renderer when a sort is active.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -352,9 +355,15 @@ export const STYLES = /* css */`
     border-color: #aaa;
 }
 
-/* Sort-change shading flash — must beat nth-child and hover colours */
-.st-shading-changed {
-    background-color: #fef08a !important;
+/* Value-group shading — applied to <tr> when a sort is active.
+   Consecutive rows sharing the same primary-sort value get the same shade;
+   the group alternates on every value boundary.
+   !important is required to override the nth-child zebra rule below. */
+.st-tr.st-shade-b .st-td {
+    background-color: #dbeafe !important; /* light blue — alternating group */
+}
+.st-tr.st-shade-a .st-td {
+    background-color: #fff !important;    /* white — default group */
 }
 
 /* ============================================================

@@ -192,10 +192,9 @@ Passed as `options` to `SmartTable.render()`.
 
 ```
 TableOptions {
-    tableClass?:        string    // CSS class on <table>, default 'st-table'
-    theme?:             string    // reserved: 'light' | 'dark'
-    shadingEnabled?:    boolean   // default true
-    shadingDurationMs?: number    // default 600
-    stickyHeader?:      boolean   // default true
+    tableClass?:     string    // CSS class on <table>, default 'st-table'
+    theme?:          string    // reserved: 'light' | 'dark'
+    shadingEnabled?: boolean   // default true — if false, no st-shade-a/b classes applied
+    stickyHeader?:   boolean   // default true
 }
 ```

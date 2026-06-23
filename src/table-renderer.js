@@ -7,7 +7,7 @@
  *     1. inject() — create table skeleton + inject trigger button on the page
  *     2. render() — build thead/tbody from current data + filter/sort/collapse state
  *     3. re-render() — called after any state change (filter, sort, collapse toggle)
- * @version 1.4.0
+ * @version 1.5.0
  */
 
 // ---------------------------------------------------------------------------
@@ -50,6 +50,13 @@
 //         matches in <mark class="st-highlight"> via _applyHighlight().
 //         Cells with a col.render callback are not highlighted.
 //         stickyHeader inline styles moved from _buildTable() into _buildThead().
+// 1.5.0 — value-group shading replaces position-change flash shading
+//         Each <tr> gets st-shade-a or st-shade-b based on the primary sort
+//         column's value. Consecutive rows sharing the same value share a shade
+//         group; the group alternates whenever the value changes. This produces
+//         persistent visible banding (e.g. all 1966 rows tinted, all 1967 rows
+//         white) regardless of whether sorting changed row order. The old
+//         per-<td> st-shading-changed setTimeout flash is removed.
 // ---------------------------------------------------------------------------
 
 import { CollapseEngine }                          from './collapse-engine.js';
@@ -87,7 +94,8 @@ const C = {
     SUBROW:         'st-subrow',
     SUBROW_HIDDEN:  'st-subrow--hidden',
     CELL_TOGGLE:    'st-cell-toggle',
-    SHADING:        'st-shading-changed',
+    SHADE_A:        'st-shade-a',
+    SHADE_B:        'st-shade-b',
     FILTER_ACTIVE:  'st-th--filter-active',
     SORT_ACTIVE:    'st-th--sort-active',
     BTN_TRIGGER:      'st-btn-trigger',
@@ -112,10 +120,9 @@ export class TableRenderer {
         this._columns   = columns;
         this._container = container;
         this._options   = {
-            tableClass:         C.TABLE,
-            shadingEnabled:     true,
-            shadingDurationMs:  600,
-            stickyHeader:       true,
+            tableClass:     C.TABLE,
+            shadingEnabled: true,
+            stickyHeader:   true,
             ...options,
         };
 
@@ -531,6 +538,13 @@ export class TableRenderer {
         );
         this._displayIdxs = this._sort.sort(filtered, this._rows);
 
+        // Value-group shading: alternate st-shade-a / st-shade-b each time the
+        // primary sort column's value changes between consecutive rows.
+        const primarySortKey = this._sort.getStack()[0]?.colKey ?? null;
+        let shadeGroup = 0;
+        const _SHADE_SENTINEL = Symbol('shade-sentinel');
+        let prevShadeValue = _SHADE_SENTINEL;
+
         const tbody = document.createElement('tbody');
         tbody.className = C.TBODY;
 
@@ -539,6 +553,15 @@ export class TableRenderer {
             const tr  = document.createElement('tr');
             tr.className = C.TR;
             tr.dataset.origIdx = String(origIdx);
+
+            if (primarySortKey && this._options.shadingEnabled !== false) {
+                const groupValue = String(row[primarySortKey] ?? '');
+                if (prevShadeValue !== _SHADE_SENTINEL && groupValue !== prevShadeValue) {
+                    shadeGroup = 1 - shadeGroup;
+                }
+                prevShadeValue = groupValue;
+                tr.classList.add(shadeGroup === 0 ? C.SHADE_A : C.SHADE_B);
+            }
 
             for (const col of this._columns) {
                 tr.appendChild(
@@ -559,27 +582,12 @@ export class TableRenderer {
      * @param {ColumnDef}    col
      * @param {NormalizedRow} row
      * @param {number}       origIdx    - Stable original row index.
-     * @param {number}       displayPos - Current display position (for shading).
+     * @param {number}       displayPos - Current display position (0-based).
      * @returns {HTMLTableCellElement}
      */
     _buildTd(col, row, origIdx, displayPos) {
         const td = document.createElement('td');
         td.className = C.TD;
-
-        // Shading class (value changed position since last sort)
-        if (this._options.shadingEnabled) {
-            const shadingClass = this._sort.getShadingClass(col.key, displayPos);
-            if (shadingClass) {
-                td.classList.add(C.SHADING);
-                if (this._options.shadingDurationMs) {
-                    td.style.transition =
-                        `background-color ${this._options.shadingDurationMs}ms ease`;
-                }
-                // Remove shading class after transition so it can re-trigger
-                setTimeout(() => td.classList.remove(C.SHADING),
-                    this._options.shadingDurationMs ?? 600);
-            }
-        }
 
         // Inspect cell for FilterEngine meta cache
         const rawEl = document.createElement('div');

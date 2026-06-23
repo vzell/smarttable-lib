@@ -48,7 +48,8 @@
 | `st-subrow` | div | One sub-row line inside a cell |
 | `st-subrow--hidden` | div modifier | Hidden when cell is collapsed |
 | `st-cell-toggle` | button | Per-cell collapse/expand toggle |
-| `st-shading-changed` | td modifier | Applied on sort value change, auto-removed |
+| `st-shade-a` | tr modifier | Value-group shading — white (default group, primary sort active) |
+| `st-shade-b` | tr modifier | Value-group shading — light blue (alternating group) |
 | `st-dropdown` | div | Filter dropdown root |
 | `st-dropdown-section` | div | One section within dropdown |
 | `st-dropdown-section-head` | div | Section heading label |
