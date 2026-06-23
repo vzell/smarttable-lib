@@ -1,0 +1,30 @@
+[
+    {
+        "version": "1.0.0",
+        "date": "2026-06-23",
+        "summary": "Initial release — full-featured interactive table library for Tampermonkey userscripts.",
+        "added": [
+            "CollapseEngine — per-column and per-cell collapse with configurable peekRows; header badge shows collapsed/total counts",
+            "FilterEngine — four-stage pipeline: global regex → column regex → meta predicates (isEmpty, hasImage, hasLink, brokenSrc) → value list; CellMeta cached at build time",
+            "SortEngine — multi-column sort stack with Shift+click priority; position-change shading snapshot survives re-renders",
+            "ResizeEngine — off-screen ruler auto-resize (measures all visible sub-rows) and drag-to-resize via <colgroup>/<col>; table-layout switches to fixed after first resize",
+            "Dropdown — three-section filter dropdown: meta flags, quick regex input, scrollable value list with occurrence counts",
+            "CellInspector — walks raw TD/TH element and returns CellMeta: links, images, text strings, isEmpty, hasBrokenSrc flags",
+            "TableRenderer — wires all five engines into a fully interactive <table> DOM; sticky header, global regex bar with Exclude/Case toggles, Auto-size columns button, per-column sort/collapse/filter controls",
+            "Derived column support — ColumnDef.derivedFrom + ColumnDef.derive(srcStr) pre-computed in _expandRow() at construction so sort, filter, and collapse all see computed values",
+            "SmartTable.render({ columns, rows, container, options }) — single public entry point; returns TableRenderer for lifecycle control",
+            "src/styles.js — complete default stylesheet for all 37 st- namespaced CSS classes; auto-injects <style id=\"st-styles\"> when loaded via @require, exports STYLES string for GM_addStyle() / bundler use",
+            "adapters/jungleland.js — JunglelandAdapter for jungleland.it/html/list.htm; extracts bootleg links by href pattern, parses date from title text, derives year/month/day columns",
+            "adapters/brucespringsteen-it.js — BrucespringsteenitAdapter for brucespringsteen.it/DB/records.aspx; dual-mode (official vs unofficial) detected from tipe query param; columnDefs getter switches schema at render time",
+            "adapters/archive-org.js — ArchiveOrgAdapter for archive.org bootleg search; page is a React SPA so data is fetched from advancedsearch.php JSON API via GM_xmlhttpRequest; extract() is async, returns a Promise",
+            "adapters/brucebase.js — BrucebaseAdapter for brucebase.wikidot.com; splits #page-content on <HR> elements into event blocks; extracts date, venue, eventType, setlist, hasBootleg, hasSetlist from wiki markup",
+            "esbuild bundler — npm run build → dist/smarttable.min.js (IIFE, ~32 kB minified, ES2020 target); npm run build:dev → unminified with inline source maps; npm run watch for development",
+            ".github/workflows/release.yml — on semver tag push: rebuilds dist, verifies committed dist matches source, verifies package.json version matches tag, creates GitHub Release with dist as asset"
+        ],
+        "notes": [
+            "All adapters set window.XxxAdapter globals instead of using ES module export default — required for Tampermonkey @require loading",
+            "archive.org adapter extract() returns a Promise; userscripts must call SmartTable.render() from .then()",
+            "dist/smarttable.min.js bundles styles.js as a side-effect import so no separate stylesheet @require is needed"
+        ]
+    }
+]

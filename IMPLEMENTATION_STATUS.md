@@ -102,18 +102,7 @@ Release workflow: `.github/workflows/release.yml` — ✅ Done
 
 ---
 
-## TODO — CHANGELOG.json
+## CHANGELOG.json — ✅ Done
 
-Initial structure:
-```json
-[
-  {
-    "version": "1.0.0",
-    "date": "TBD",
-    "changes": [
-      "Initial release",
-      "TableRenderer, SortEngine, FilterEngine, CollapseEngine, ResizeEngine, Dropdown"
-    ]
-  }
-]
-```
+`CHANGELOG.json` — array of release objects with `version`, `date`, `summary`,
+`added[]`, and `notes[]` fields. Current entry: v1.0.0 (2026-06-23).
